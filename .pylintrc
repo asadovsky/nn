@@ -1,6 +1,7 @@
 [BASIC]
 
 variable-rgx=^[a-z][a-z0-9_]*$
+docstring-min-length=10
 
 
 [FORMAT]
