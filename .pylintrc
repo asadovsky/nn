@@ -1,0 +1,8 @@
+[BASIC]
+
+variable-rgx=^[a-z][a-z0-9_]*$
+
+
+[FORMAT]
+
+indent-string='  '
