@@ -83,7 +83,7 @@ def train_linear_regressor():
 
 
 def train_ad_hoc():
-  """Trains linear regression model with ad hoc training code."""
+  """Trains linear regression model using ad hoc training code."""
   tf.reset_default_graph()
   x = tf.placeholder(tf.float32, shape=[None, 1])
   y = tf.placeholder(tf.float32, shape=[None])
@@ -96,14 +96,14 @@ def train_ad_hoc():
 
   with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    compute_loss = lambda: sess.run(
-        loss, feed_dict={x: X_VALS.reshape([-1, 1]), y: Y_VALS})
+    eval_feed_dict = {x: X_VALS.reshape([-1, 1]), y: Y_VALS}
     for epoch in range(TRAIN_EPOCHS):
       if epoch % LOG_EPOCHS == 0:
         print("epoch={} loss={} w={} b={}".format(
-            epoch, compute_loss(), sess.run(w), sess.run(b)))
+            epoch, *sess.run([loss, w, b], feed_dict=eval_feed_dict)))
       for (x_val, y_val) in zip(X_VALS, Y_VALS):
         sess.run(train_op,
                  feed_dict={x: np.reshape(x_val, [-1, 1]),
                             y: np.reshape(y_val, [-1])})
-    print("loss={} w={} b={}".format(compute_loss(), sess.run(w), sess.run(b)))
+    print("loss={} w={} b={}".format(
+        *sess.run([loss, w, b], feed_dict=eval_feed_dict)))
