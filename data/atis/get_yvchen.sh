@@ -11,7 +11,6 @@ F=(
   'atis.test.w-intent.iob'
   'atis.train.iob'
   'atis.train.w-intent.iob'
-  'sample.iob'
 )
 
 for f in "${F[@]}"; do

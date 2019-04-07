@@ -22,7 +22,7 @@ def print_fold(fold):
   train_w, train_ne, train_la = train
   test_w, test_ne, test_la = test  # pylint: disable=unused-variable
 
-  col = 25
+  col = 30
   for w, ne, la in zip(train_w, train_ne, train_la):
     print 'WORD'.rjust(col), 'TABLE'.rjust(col), 'LABEL'.rjust(col)
     for w_i, ne_i, la_i in zip(w, ne, la):
