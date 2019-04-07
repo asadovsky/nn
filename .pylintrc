@@ -13,3 +13,8 @@ docstring-min-length=10
 
 max-line-length=80
 indent-string='  '
+
+
+[DESIGN]
+
+max-locals=99
