@@ -1,4 +1,4 @@
-"""Utilities for loading ATIS data."""
+"""Utilities for loading mesnilgr's ATIS data."""
 
 import cPickle
 
