@@ -1,5 +1,9 @@
 """Utilities for loading yvchen's ATIS data."""
 
+# Reference:
+# https://github.com/yvchen/JointSLU/blob/master/program/wordSlotDataSet.py
+
+
 def process_tokens(tokens, token2id, id2token):
   token_ids = []
   for token in tokens:
