@@ -1,5 +1,17 @@
 # References
 
+## TODO
+
+- Develop baseline intent classifiers
+  - Softmax over mean of GloVe embeddings
+  - LSTM with GloVe embeddings
+- Develop baseline slot predictors
+  - BOW over n^2 spans, softmax across all span labels
+- Experiment
+  - BiLSTM
+  - Character vs. word vs. WordPiece
+  - FastText, ULMFiT, ELMo, BERT
+
 ## Semantic parsing
 
 ### Papers
