@@ -3,6 +3,11 @@
 disable=fixme
 
 
+[TYPECHECK]
+
+ignored-modules=tensorflow.keras
+
+
 [BASIC]
 
 variable-rgx=^[a-z][a-z0-9_]*$
