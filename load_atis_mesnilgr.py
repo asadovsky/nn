@@ -4,7 +4,7 @@ import cPickle
 
 
 def load_fold(fold):
-  """Returns (train, valid, test, maps) for a given fold."""
+  """Returns (train, valid, test, maps) for the given fold."""
   assert fold in range(5)
   with open('./data/atis/atis.fold%d.pkl' % fold, mode='rb') as f:
     return cPickle.load(f)
