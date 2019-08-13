@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Embedding
 from tensorflow.keras.layers import Flatten
@@ -17,7 +18,7 @@ tf.set_random_seed(0)
 GLOVE_PATH = 'data/glove/glove.6B.100d.txt'
 GLOVE_DIM = 100
 
-# Source: https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/
+# https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/
 NUM_CLASSES = 2
 DOCS = ['Well done!',
         'Good work',
