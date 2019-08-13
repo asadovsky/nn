@@ -3,17 +3,22 @@
 from __future__ import print_function
 
 import numpy as np
-from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
-from tensorflow.keras.layers import Flatten
 from tensorflow.keras.layers import Embedding
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.utils import to_categorical
+
+np.random.seed(0)
+tf.set_random_seed(0)
 
 GLOVE_PATH = 'data/glove/glove.6B.100d.txt'
 GLOVE_DIM = 100
 
 # Source: https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/
+NUM_CLASSES = 2
 DOCS = ['Well done!',
         'Good work',
         'Great effort',
@@ -52,8 +57,8 @@ def make_glove_embedding(tokenizer):
                    input_length=PAD_LEN, trainable=False)
 
 
-def train_simple(use_glove):
-  """Trains a simple model."""
+def train_model(use_glove, is_categorical):
+  """Trains a model."""
   t = Tokenizer()
   t.fit_on_texts(DOCS)
   encoded_docs = t.texts_to_sequences(DOCS)
@@ -65,12 +70,23 @@ def train_simple(use_glove):
   else:
     embedding = make_rand_embedding(t)
 
+  labels = LABELS
+  loss = 'binary_crossentropy'
+  if is_categorical:
+    labels = to_categorical(LABELS, NUM_CLASSES)
+    loss = 'categorical_crossentropy'
+
   model = Sequential()
   model.add(embedding)
   model.add(Flatten())
-  model.add(Dense(1, activation='sigmoid'))
-  model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['acc'])
+
+  if is_categorical:
+    model.add(Dense(NUM_CLASSES, activation='softmax'))
+  else:
+    model.add(Dense(1, activation='sigmoid'))
+
+  model.compile(loss=loss, optimizer='adam', metrics=['acc'])
   print(model.summary())
-  model.fit(padded_docs, LABELS, epochs=50, verbose=0)
-  loss, accuracy = model.evaluate(padded_docs, LABELS, verbose=0)
+  model.fit(padded_docs, labels, epochs=50, verbose=0)
+  loss, accuracy = model.evaluate(padded_docs, labels, verbose=0)
   print('loss=%f accuracy=%f' % (loss, accuracy * 100))
