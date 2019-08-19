@@ -17,11 +17,8 @@ import glove_utils
 np.random.seed(0)
 tf.set_random_seed(0)
 
-GLOVE_PATH = 'data/glove/glove.6B.100d.txt'
-GLOVE_DIM = 100
 
 # https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/
-NUM_CLASSES = 2
 DOCS = ['Well done!',
         'Good work',
         'Great effort',
@@ -33,6 +30,7 @@ DOCS = ['Well done!',
         'poor work',
         'Could have done better.']
 LABELS = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
+NUM_CLASSES = len(set(LABELS))
 PAD_LEN = 4
 
 
