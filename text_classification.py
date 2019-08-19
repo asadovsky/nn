@@ -48,7 +48,7 @@ def make_glove_embedding(tokenizer):
     for line in f:
       parts = line.split()
       word2vec[parts[0]] = np.asarray(parts[1:], dtype='float32')
-  print('Loaded %d word vectors' % len(word2vec))
+  print('Loaded {} word vectors'.format(len(word2vec)))
   embedding_matrix = np.zeros((vocab_size, GLOVE_DIM))
   for word, i in tokenizer.word_index.items():
     vec = word2vec.get(word)
@@ -90,4 +90,4 @@ def train_model(use_glove, is_categorical):
   print(model.summary())
   model.fit(padded_docs, labels, epochs=50, verbose=0)
   loss, accuracy = model.evaluate(padded_docs, labels, verbose=0)
-  print('loss=%f accuracy=%f' % (loss, accuracy * 100))
+  print('loss={} accuracy={}'.format(loss, accuracy * 100))
