@@ -1,3 +1,4 @@
+# http://pylint.pycqa.org/en/latest/technical_reference/features.html
 # https://github.com/tensorflow/tensorflow/blob/master/tensorflow/tools/ci_build/pylintrc
 
 
@@ -24,6 +25,11 @@ indent-string='  '
 ignore-long-lines=(?x)
   (^(import|from)\s
    |(https?|ftp):)
+
+
+[SIMILARITIES]
+
+ignore-imports=yes
 
 
 [DESIGN]
