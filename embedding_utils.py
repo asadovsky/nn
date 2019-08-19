@@ -31,6 +31,13 @@ def _make_embedding_matrix(word2id, word2vec):
   return embedding_matrix
 
 
+def make_rand_embedding(word2id, input_length):
+  """Returns an Embedding with random word vectors."""
+  input_dim = len(word2id) + 1
+  output_dim = 8
+  return Embedding(input_dim, output_dim, input_length=input_length)
+
+
 def make_glove_embedding(word2id, input_length):
   """Returns an Embedding with GloVe word vectors."""
   word2vec = _load_glove()

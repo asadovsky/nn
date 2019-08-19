@@ -33,13 +33,6 @@ NUM_CLASSES = len(set(LABELS))
 PAD_LEN = 4
 
 
-def make_rand_embedding(word2id, input_length):
-  """Returns an Embedding with random word vectors."""
-  input_dim = len(word2id) + 1
-  output_dim = 8
-  return Embedding(input_dim, output_dim, input_length=input_length)
-
-
 def train_model(use_glove, is_categorical):
   """Trains a model."""
   t = Tokenizer()
@@ -51,7 +44,7 @@ def train_model(use_glove, is_categorical):
   if use_glove:
     embedding = embedding_utils.make_glove_embedding(t.word_index, PAD_LEN)
   else:
-    embedding = make_rand_embedding(t.word_index, PAD_LEN)
+    embedding = embedding_utils.make_rand_embedding(t.word_index, PAD_LEN)
 
   labels = LABELS
   loss = 'binary_crossentropy'
