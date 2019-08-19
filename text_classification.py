@@ -5,7 +5,6 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import Dense
-from tensorflow.keras.layers import Embedding
 from tensorflow.keras.layers import Flatten
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.sequence import pad_sequences
@@ -55,7 +54,6 @@ def train_model(use_glove, is_categorical):
   model = Sequential()
   model.add(embedding)
   model.add(Flatten())
-
   if is_categorical:
     model.add(Dense(NUM_CLASSES, activation='softmax'))
   else:

@@ -4,7 +4,7 @@
 
 [MESSAGES CONTROL]
 
-disable=fixme
+disable=design,fixme,similarities
 
 
 [TYPECHECK]
@@ -25,13 +25,3 @@ indent-string='  '
 ignore-long-lines=(?x)
   (^(import|from)\s
    |(https?|ftp):)
-
-
-[SIMILARITIES]
-
-ignore-imports=yes
-
-
-[DESIGN]
-
-max-locals=99

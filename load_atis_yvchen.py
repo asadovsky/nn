@@ -38,8 +38,8 @@ class Dataset(object):  # pylint: disable=too-few-public-methods
         tags = parts[1].strip().split()
         assert len(words) == len(tags)
         self.word_id_lists.append(
-          _process_tokens(words, self.word2id, self.id2word))
+            _process_tokens(words, self.word2id, self.id2word))
         self.tag_id_lists.append(
-          _process_tokens(tags[:-1], self.tag2id, self.id2tag))
+            _process_tokens(tags[:-1], self.tag2id, self.id2tag))
         self.intent_ids.append(
-          _process_tokens([tags[-1]], self.intent2id, self.id2intent)[0])
+            _process_tokens([tags[-1]], self.intent2id, self.id2intent)[0])
