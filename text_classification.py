@@ -12,7 +12,7 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.utils import to_categorical
 
-import glove_utils
+import embedding_utils
 
 np.random.seed(0)
 tf.set_random_seed(0)
@@ -43,10 +43,10 @@ def make_rand_embedding(word2id, input_length):
 
 def make_glove_embedding(word2id, input_length):
   """Returns an Embedding with GloVe word vectors."""
-  word2vec = glove_utils.load_word2vec()
+  word2vec = embedding_utils.load_glove()
   input_dim = len(word2id) + 1
   output_dim = len(word2vec.itervalues().next())
-  embedding_matrix = glove_utils.make_embedding_matrix(word2id, word2vec)
+  embedding_matrix = embedding_utils.make_embedding_matrix(word2id, word2vec)
   return Embedding(input_dim, output_dim, weights=[embedding_matrix],
                    input_length=input_length, trainable=False)
 
