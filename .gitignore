@@ -1,3 +1,4 @@
+*.pyc
 data/**/*.iob
 data/**/*.pkl
 data/**/*.txt

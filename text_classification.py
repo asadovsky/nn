@@ -34,15 +34,15 @@ LABELS = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
 PAD_LEN = 4
 
 
-def make_rand_embedding(tokenizer):
+def make_rand_embedding(word2id):
   """Returns an Embedding with random word vectors."""
-  vocab_size = len(tokenizer.word_index) + 1
+  vocab_size = len(word2id) + 1
   return Embedding(vocab_size, 8, input_length=PAD_LEN)
 
 
-def make_glove_embedding(tokenizer):
+def make_glove_embedding(word2id):
   """Returns an Embedding with GloVe word vectors."""
-  vocab_size = len(tokenizer.word_index) + 1
+  vocab_size = len(word2id) + 1
   word2vec = dict()
   with open(GLOVE_PATH) as f:
     for line in f:
@@ -50,7 +50,7 @@ def make_glove_embedding(tokenizer):
       word2vec[parts[0]] = np.asarray(parts[1:], dtype='float32')
   print('Loaded {} word vectors'.format(len(word2vec)))
   embedding_matrix = np.zeros((vocab_size, GLOVE_DIM))
-  for word, i in tokenizer.word_index.items():
+  for word, i in word2id.items():
     vec = word2vec.get(word)
     if vec is not None:
       embedding_matrix[i] = vec
@@ -67,9 +67,9 @@ def train_model(use_glove, is_categorical):
 
   embedding = None
   if use_glove:
-    embedding = make_glove_embedding(t)
+    embedding = make_glove_embedding(t.word_index)
   else:
-    embedding = make_rand_embedding(t)
+    embedding = make_rand_embedding(t.word_index)
 
   labels = LABELS
   loss = 'binary_crossentropy'
