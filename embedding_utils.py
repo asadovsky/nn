@@ -3,11 +3,12 @@
 from __future__ import print_function
 
 import numpy as np
+from tensorflow.keras.layers import Embedding
 
 _GLOVE_PATH = 'data/glove/glove.6B.100d.txt'
 
 
-def load_glove():
+def _load_glove():
   """Loads GloVe word vectors."""
   word2vec = dict()
   with open(_GLOVE_PATH) as f:
@@ -18,7 +19,7 @@ def load_glove():
   return word2vec
 
 
-def make_embedding_matrix(word2id, word2vec):
+def _make_embedding_matrix(word2id, word2vec):
   """Makes an embedding matrix for the given words."""
   vocab_size = len(word2id) + 1
   dim = len(word2vec.itervalues().next())
@@ -28,3 +29,13 @@ def make_embedding_matrix(word2id, word2vec):
     if vec is not None:
       embedding_matrix[i] = vec
   return embedding_matrix
+
+
+def make_glove_embedding(word2id, input_length):
+  """Returns an Embedding with GloVe word vectors."""
+  word2vec = _load_glove()
+  input_dim = len(word2id) + 1
+  output_dim = len(word2vec.itervalues().next())
+  embedding_matrix = _make_embedding_matrix(word2id, word2vec)
+  return Embedding(input_dim, output_dim, weights=[embedding_matrix],
+                   input_length=input_length, trainable=False)
