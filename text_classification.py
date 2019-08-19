@@ -12,6 +12,8 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.utils import to_categorical
 
+import glove_utils
+
 np.random.seed(0)
 tf.set_random_seed(0)
 
@@ -34,28 +36,21 @@ LABELS = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
 PAD_LEN = 4
 
 
-def make_rand_embedding(word2id):
+def make_rand_embedding(word2id, input_length):
   """Returns an Embedding with random word vectors."""
-  vocab_size = len(word2id) + 1
-  return Embedding(vocab_size, 8, input_length=PAD_LEN)
+  input_dim = len(word2id) + 1
+  output_dim = 8
+  return Embedding(input_dim, output_dim, input_length=input_length)
 
 
-def make_glove_embedding(word2id):
+def make_glove_embedding(word2id, input_length):
   """Returns an Embedding with GloVe word vectors."""
-  vocab_size = len(word2id) + 1
-  word2vec = dict()
-  with open(GLOVE_PATH) as f:
-    for line in f:
-      parts = line.split()
-      word2vec[parts[0]] = np.asarray(parts[1:], dtype='float32')
-  print('Loaded {} word vectors'.format(len(word2vec)))
-  embedding_matrix = np.zeros((vocab_size, GLOVE_DIM))
-  for word, i in word2id.items():
-    vec = word2vec.get(word)
-    if vec is not None:
-      embedding_matrix[i] = vec
-  return Embedding(vocab_size, GLOVE_DIM, weights=[embedding_matrix],
-                   input_length=PAD_LEN, trainable=False)
+  word2vec = glove_utils.load_word2vec()
+  input_dim = len(word2id) + 1
+  output_dim = len(word2vec.itervalues().next())
+  embedding_matrix = glove_utils.make_embedding_matrix(word2id, word2vec)
+  return Embedding(input_dim, output_dim, weights=[embedding_matrix],
+                   input_length=input_length, trainable=False)
 
 
 def train_model(use_glove, is_categorical):
@@ -67,9 +62,9 @@ def train_model(use_glove, is_categorical):
 
   embedding = None
   if use_glove:
-    embedding = make_glove_embedding(t.word_index)
+    embedding = make_glove_embedding(t.word_index, PAD_LEN)
   else:
-    embedding = make_rand_embedding(t.word_index)
+    embedding = make_rand_embedding(t.word_index, PAD_LEN)
 
   labels = LABELS
   loss = 'binary_crossentropy'
