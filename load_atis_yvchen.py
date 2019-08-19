@@ -20,12 +20,15 @@ class Dataset(object):  # pylint: disable=too-few-public-methods
   def __init__(self, filename):
     self.word_id_lists = []  # word lists (utterances), one per example
     self.tag_id_lists = []   # IOB tag lists, one per example
+    self.intent_ids = []     # intents, one per example
 
     # Reserve index 0 for padding, 1 for unknown words/tokens.
     self.word2id = {'<pad>': 0, '<unk>': 1}
     self.tag2id = {'<pad>': 0, '<unk>': 1}
+    self.intent2id = dict()
     self.id2word = ['<pad>', '<unk>']
     self.id2tag = ['<pad>', '<unk>']
+    self.id2intent = []
 
     with open(filename, mode='rb') as f:
       for line in f:
@@ -34,7 +37,9 @@ class Dataset(object):  # pylint: disable=too-few-public-methods
         words = parts[0].strip().split()
         tags = parts[1].strip().split()
         assert len(words) == len(tags)
-        word_ids = _process_tokens(words, self.word2id, self.id2word)
-        tag_ids = _process_tokens(tags, self.tag2id, self.id2tag)
-        self.word_id_lists.append(word_ids)
-        self.tag_id_lists.append(tag_ids)
+        self.word_id_lists.append(
+          _process_tokens(words, self.word2id, self.id2word))
+        self.tag_id_lists.append(
+          _process_tokens(tags[:-1], self.tag2id, self.id2tag))
+        self.intent_ids.append(
+          _process_tokens([tags[-1]], self.intent2id, self.id2intent)[0])
