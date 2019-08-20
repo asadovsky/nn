@@ -28,7 +28,6 @@ DOCS = ['Well done!',
         'poor work',
         'Could have done better.']
 LABELS = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
-NUM_CLASSES = len(set(LABELS))
 PAD_LEN = 4
 
 
@@ -45,22 +44,23 @@ def train_model(use_glove, is_categorical):
   else:
     embedding = embedding_utils.make_rand_embedding(t.word_index, PAD_LEN)
 
+  num_classes = len(set(LABELS))
   labels = LABELS
   loss = 'binary_crossentropy'
   if is_categorical:
-    labels = to_categorical(LABELS, NUM_CLASSES)
+    labels = to_categorical(LABELS, num_classes)
     loss = 'categorical_crossentropy'
 
   model = Sequential()
   model.add(embedding)
   model.add(Flatten())
   if is_categorical:
-    model.add(Dense(NUM_CLASSES, activation='softmax'))
+    model.add(Dense(num_classes, activation='softmax'))
   else:
     model.add(Dense(1, activation='sigmoid'))
 
   model.compile(loss=loss, optimizer='adam', metrics=['acc'])
   print(model.summary())
-  model.fit(padded_docs, labels, epochs=50, verbose=0)
+  model.fit(padded_docs, labels, epochs=50, verbose=1)
   loss, accuracy = model.evaluate(padded_docs, labels, verbose=0)
   print('loss={} accuracy={}'.format(loss, accuracy * 100))

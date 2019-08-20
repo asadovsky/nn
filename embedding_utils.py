@@ -19,6 +19,8 @@ def _load_glove():
   return word2vec
 
 
+# TODO(sadovsky): This assumes the indexes in word2id start at 1, which is true
+# for Tokenizer data but not for load_atis_yvchen Dataset data.
 def _make_embedding_matrix(word2id, word2vec):
   """Makes an embedding matrix for the given words."""
   vocab_size = len(word2id) + 1

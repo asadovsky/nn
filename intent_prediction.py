@@ -35,7 +35,7 @@ def train_model(use_glove):
   else:
     embedding = embedding_utils.make_rand_embedding(d.word2id, PAD_LEN)
 
-  num_classes = len(d.intent_ids)
+  num_classes = len(d.intent2id)
   labels = to_categorical(d.intent_ids, num_classes)
   loss = 'categorical_crossentropy'
 
@@ -46,6 +46,6 @@ def train_model(use_glove):
 
   model.compile(loss=loss, optimizer='adam', metrics=['acc'])
   print(model.summary())
-  model.fit(padded_utts, labels, epochs=50, verbose=0)
+  model.fit(padded_utts, labels, epochs=50, verbose=1)
   loss, accuracy = model.evaluate(padded_utts, labels, verbose=0)
   print('loss={} accuracy={}'.format(loss, accuracy * 100))
