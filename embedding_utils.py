@@ -19,13 +19,11 @@ def _load_glove():
   return word2vec
 
 
-# TODO(sadovsky): This assumes the indexes in word2id start at 1, which is true
-# for Tokenizer data but not for load_atis_yvchen Dataset data.
 def _make_embedding_matrix(word2id, word2vec):
   """Makes an embedding matrix for the given words."""
-  vocab_size = len(word2id) + 1
-  dim = len(word2vec.itervalues().next())
-  embedding_matrix = np.zeros((vocab_size, dim))
+  input_dim = max(word2id.itervalues()) + 1
+  output_dim = len(word2vec.itervalues().next())
+  embedding_matrix = np.zeros((input_dim, output_dim))
   for word, i in word2id.items():
     vec = word2vec.get(word)
     if vec is not None:
@@ -35,7 +33,7 @@ def _make_embedding_matrix(word2id, word2vec):
 
 def make_rand_embedding(word2id, input_length):
   """Returns an Embedding with random word vectors."""
-  input_dim = len(word2id) + 1
+  input_dim = max(word2id.itervalues()) + 1
   output_dim = 8
   return Embedding(input_dim, output_dim, input_length=input_length)
 
@@ -43,7 +41,7 @@ def make_rand_embedding(word2id, input_length):
 def make_glove_embedding(word2id, input_length):
   """Returns an Embedding with GloVe word vectors."""
   word2vec = _load_glove()
-  input_dim = len(word2id) + 1
+  input_dim = max(word2id.itervalues()) + 1
   output_dim = len(word2vec.itervalues().next())
   embedding_matrix = _make_embedding_matrix(word2id, word2vec)
   return Embedding(input_dim, output_dim, weights=[embedding_matrix],
