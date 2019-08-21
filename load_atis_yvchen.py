@@ -16,7 +16,7 @@ def _process_tokens(tokens, token2id, id2token):
 
 class Dataset(object):  # pylint: disable=too-few-public-methods
   """An ATIS dataset."""
-  # TODO: Add support for taking word and tag maps as input.
+  # TODO: Add support for taking word/tag/intent maps as input.
   def __init__(self, filename):
     self.word_id_lists = []  # word lists (utterances), one per example
     self.tag_id_lists = []   # IOB tag lists, one per example
