@@ -1,11 +1,13 @@
 """ATIS intent prediction."""
 
 from __future__ import print_function
+from collections import namedtuple
 
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import GlobalMaxPool1D
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.utils import to_categorical
@@ -17,20 +19,21 @@ np.random.seed(0)
 tf.set_random_seed(0)
 
 PAD_LEN = 32
+TRAIN_FILENAME = 'data/atis/atis.train.w-intent.iob'
+TEST_FILENAME = 'data/atis/atis.test.w-intent.iob'
 
 
-def load_train():
-  return Dataset('data/atis/atis-2.train.w-intent.iob')
+HParams = namedtuple('HParams', ['use_glove', 'max_pool'])
 
 
-def train_model(use_glove):
+def train_model(hparams):
   """Trains a model."""
-  d = load_train()
+  d = Dataset(TRAIN_FILENAME)
   padded_utts = pad_sequences(d.word_id_lists, maxlen=PAD_LEN, padding='post',
                               value=d.word2id['<pad>'])
 
   embedding = None
-  if use_glove:
+  if hparams.use_glove:
     embedding = embedding_utils.make_glove_embedding(d.word2id, PAD_LEN)
   else:
     embedding = embedding_utils.make_rand_embedding(d.word2id, PAD_LEN)
@@ -41,7 +44,10 @@ def train_model(use_glove):
 
   model = Sequential()
   model.add(embedding)
-  model.add(Flatten())
+  if hparams.max_pool:
+    model.add(GlobalMaxPool1D())
+  else:
+    model.add(Flatten())
   model.add(Dense(num_classes, activation='softmax'))
 
   model.compile(loss=loss, optimizer='adam', metrics=['acc'])
