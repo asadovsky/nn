@@ -1,6 +1,7 @@
 """Text classification examples."""
 
 from __future__ import print_function
+from collections import namedtuple
 
 import numpy as np
 import tensorflow as tf
@@ -31,7 +32,10 @@ LABELS = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
 PAD_LEN = 4
 
 
-def train_model(use_glove, is_categorical):
+HParams = namedtuple('HParams', ['use_glove', 'categorical'])
+
+
+def train_model(hparams):
   """Trains a model."""
   t = Tokenizer()
   t.fit_on_texts(DOCS)
@@ -39,7 +43,7 @@ def train_model(use_glove, is_categorical):
   padded_docs = pad_sequences(encoded_docs, maxlen=PAD_LEN, padding='post')
 
   embedding = None
-  if use_glove:
+  if hparams.use_glove:
     embedding = embedding_utils.make_glove_embedding(t.word_index, PAD_LEN)
   else:
     embedding = embedding_utils.make_rand_embedding(t.word_index, PAD_LEN)
@@ -47,20 +51,20 @@ def train_model(use_glove, is_categorical):
   num_classes = len(set(LABELS))
   labels = LABELS
   loss = 'binary_crossentropy'
-  if is_categorical:
+  if hparams.categorical:
     labels = to_categorical(LABELS, num_classes)
     loss = 'categorical_crossentropy'
 
   model = Sequential()
   model.add(embedding)
   model.add(Flatten())
-  if is_categorical:
+  if hparams.categorical:
     model.add(Dense(num_classes, activation='softmax'))
   else:
     model.add(Dense(1, activation='sigmoid'))
 
   model.compile(loss=loss, optimizer='adam', metrics=['acc'])
   print(model.summary())
-  model.fit(padded_docs, labels, epochs=50, verbose=1)
+  model.fit(padded_docs, labels, epochs=50, verbose=0)
   loss, accuracy = model.evaluate(padded_docs, labels, verbose=0)
   print('loss={} accuracy={}'.format(loss, accuracy * 100))
