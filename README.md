@@ -1,15 +1,20 @@
 # References
 
+## Next steps
+
+- Evaluate on test set
+- Plot accuracy and loss curves
+- TensorBoard
+
 ## TODO
 
 - Develop baseline intent classifiers
-  - Softmax over mean of GloVe embeddings
-  - LSTM with GloVe embeddings
+  - BiLSTM with GloVe embeddings
 - Develop baseline slot predictors
   - BOW over n^2 spans, softmax across all span labels
+  - Use Viterbi algorithm during decoding
 - Experiment
-  - BiLSTM
-  - Character vs. word vs. WordPiece
+  - Character vs. word vs. WordPiece embeddings
   - FastText, ULMFiT, ELMo, BERT
 
 ## Semantic parsing
