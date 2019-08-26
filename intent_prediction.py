@@ -12,8 +12,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.utils import to_categorical
 
-# TODO: Rename to "atis_yvchen"; rename to "embedding"; define mesnilgr Dataset.
-from load_atis_yvchen import Dataset
+import atis_yvchen
 import embedding_utils
 import plotting
 
@@ -30,15 +29,15 @@ HParams = namedtuple('HParams', ['use_glove', 'max_pool'])
 
 def get_inputs_and_labels(d):
   inputs = pad_sequences(d.word_id_lists, maxlen=PAD_LEN, padding='post',
-                         value=d.word2id['<pad>'])
+                         value=d.word2id[atis_yvchen.PAD])
   labels = to_categorical(d.intent_ids, len(d.intent2id))
   return inputs, labels
 
 
 def train_model(hparams):
   """Trains a model."""
-  d_train = Dataset(TRAIN_FILENAME)
-  d_test = Dataset(TEST_FILENAME, train_dataset=d_train)
+  d_train = atis_yvchen.Dataset(TRAIN_FILENAME)
+  d_test = atis_yvchen.Dataset(TEST_FILENAME, train_dataset=d_train)
 
   # TODO: Experiment with including embeddings for words that only occur in the
   # test set. Note, though, that these wouldn't be fine-tuned during training.
