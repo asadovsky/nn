@@ -12,8 +12,10 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.utils import to_categorical
 
+# TODO: Rename to "atis_yvchen"; rename to "embedding"; define mesnilgr Dataset.
 from load_atis_yvchen import Dataset
 import embedding_utils
+import plotting
 
 np.random.seed(0)
 tf.set_random_seed(0)
@@ -26,20 +28,28 @@ TEST_FILENAME = 'data/atis/atis.test.w-intent.iob'
 HParams = namedtuple('HParams', ['use_glove', 'max_pool'])
 
 
+def get_inputs_and_labels(d):
+  inputs = pad_sequences(d.word_id_lists, maxlen=PAD_LEN, padding='post',
+                         value=d.word2id['<pad>'])
+  labels = to_categorical(d.intent_ids, len(d.intent2id))
+  return inputs, labels
+
+
 def train_model(hparams):
   """Trains a model."""
-  d = Dataset(TRAIN_FILENAME)
-  padded_utts = pad_sequences(d.word_id_lists, maxlen=PAD_LEN, padding='post',
-                              value=d.word2id['<pad>'])
+  d_train = Dataset(TRAIN_FILENAME)
+  d_test = Dataset(TEST_FILENAME, train_dataset=d_train)
 
+  # TODO: Experiment with including embeddings for words that only occur in the
+  # test set. Note, though, that these wouldn't be fine-tuned during training.
   embedding = None
   if hparams.use_glove:
-    embedding = embedding_utils.make_glove_embedding(d.word2id, PAD_LEN)
+    embedding = embedding_utils.make_glove_embedding(d_train.word2id, PAD_LEN,
+                                                     True)
   else:
-    embedding = embedding_utils.make_rand_embedding(d.word2id, PAD_LEN)
+    embedding = embedding_utils.make_rand_embedding(d_train.word2id, PAD_LEN)
 
-  num_classes = len(d.intent2id)
-  labels = to_categorical(d.intent_ids, num_classes)
+  num_classes = len(d_train.intent2id)
   loss = 'categorical_crossentropy'
 
   model = Sequential()
@@ -49,9 +59,16 @@ def train_model(hparams):
   else:
     model.add(Flatten())
   model.add(Dense(num_classes, activation='softmax'))
-
   model.compile(loss=loss, optimizer='adam', metrics=['acc'])
   print(model.summary())
-  model.fit(padded_utts, labels, epochs=50, verbose=1)
-  loss, accuracy = model.evaluate(padded_utts, labels, verbose=0)
-  print('loss={} accuracy={}'.format(loss, accuracy * 100))
+
+  X_train, y_train = get_inputs_and_labels(d_train)
+  X_test, y_test = get_inputs_and_labels(d_test)
+  history = model.fit(X_train, y_train, epochs=50, verbose=1,
+                      validation_data=(X_test, y_test))
+  plotting.plot_history(history)
+
+  loss_train, acc_train = model.evaluate(X_train, y_train, verbose=0)
+  loss_test, acc_test = model.evaluate(X_test, y_test, verbose=0)
+  print('train: loss={} accuracy={}'.format(loss_train, acc_train))
+  print('test: loss={} accuracy={}'.format(loss_test, acc_test))

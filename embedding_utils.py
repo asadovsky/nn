@@ -38,11 +38,11 @@ def make_rand_embedding(word2id, input_length):
   return Embedding(input_dim, output_dim, input_length=input_length)
 
 
-def make_glove_embedding(word2id, input_length):
+def make_glove_embedding(word2id, input_length, trainable):
   """Returns an Embedding with GloVe word vectors."""
   word2vec = _load_glove()
   input_dim = max(word2id.itervalues()) + 1
   output_dim = len(word2vec.itervalues().next())
   embedding_matrix = _make_embedding_matrix(word2id, word2vec)
   return Embedding(input_dim, output_dim, weights=[embedding_matrix],
-                   input_length=input_length, trainable=False)
+                   input_length=input_length, trainable=trainable)

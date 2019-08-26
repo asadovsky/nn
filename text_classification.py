@@ -18,16 +18,16 @@ np.random.seed(0)
 tf.set_random_seed(0)
 
 # https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/
-DOCS = ['Well done!',
-        'Good work',
-        'Great effort',
-        'nice work',
-        'Excellent!',
-        'Weak',
-        'Poor effort!',
-        'not good',
-        'poor work',
-        'Could have done better.']
+INPUTS = ['Well done!',
+          'Good work',
+          'Great effort',
+          'nice work',
+          'Excellent!',
+          'Weak',
+          'Poor effort!',
+          'not good',
+          'poor work',
+          'Could have done better.']
 LABELS = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
 PAD_LEN = 4
 
@@ -38,13 +38,14 @@ HParams = namedtuple('HParams', ['use_glove', 'categorical'])
 def train_model(hparams):
   """Trains a model."""
   t = Tokenizer()
-  t.fit_on_texts(DOCS)
-  encoded_docs = t.texts_to_sequences(DOCS)
-  padded_docs = pad_sequences(encoded_docs, maxlen=PAD_LEN, padding='post')
+  t.fit_on_texts(INPUTS)
+  encoded_inputs = t.texts_to_sequences(INPUTS)
+  padded_inputs = pad_sequences(encoded_inputs, maxlen=PAD_LEN, padding='post')
 
   embedding = None
   if hparams.use_glove:
-    embedding = embedding_utils.make_glove_embedding(t.word_index, PAD_LEN)
+    embedding = embedding_utils.make_glove_embedding(t.word_index, PAD_LEN,
+                                                     False)
   else:
     embedding = embedding_utils.make_rand_embedding(t.word_index, PAD_LEN)
 
@@ -65,6 +66,6 @@ def train_model(hparams):
 
   model.compile(loss=loss, optimizer='adam', metrics=['acc'])
   print(model.summary())
-  model.fit(padded_docs, labels, epochs=50, verbose=0)
-  loss, accuracy = model.evaluate(padded_docs, labels, verbose=0)
-  print('loss={} accuracy={}'.format(loss, accuracy * 100))
+  model.fit(padded_inputs, labels, epochs=50, verbose=0)
+  loss, acc = model.evaluate(padded_inputs, labels, verbose=0)
+  print('loss={} accuracy={}'.format(loss, acc))

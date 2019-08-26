@@ -4,9 +4,6 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
-import matplotlib
-matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt  # pylint: disable=wrong-import-position
 
 np.random.seed(0)
 tf.set_random_seed(0)
@@ -17,11 +14,6 @@ N = len(Y_VALS)
 
 TRAIN_EPOCHS = 1000
 LOG_EPOCHS = 100
-
-
-def plot_vals():
-  plt.scatter(X_VALS, Y_VALS)
-  plt.show()
 
 
 def print_vars(estimator):
