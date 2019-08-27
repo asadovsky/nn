@@ -2,3 +2,4 @@
 data/**/*.iob
 data/**/*.pkl
 data/**/*.txt
+logs

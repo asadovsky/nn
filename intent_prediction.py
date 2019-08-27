@@ -1,10 +1,12 @@
 """ATIS intent prediction."""
 
 from __future__ import print_function
+import datetime
 from collections import namedtuple
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import Flatten
 from tensorflow.keras.layers import GlobalMaxPool1D
@@ -25,6 +27,10 @@ TEST_FILENAME = 'data/atis/atis.test.w-intent.iob'
 
 
 HParams = namedtuple('HParams', ['use_glove', 'max_pool'])
+
+
+def _scalars_log_dir():
+  return 'logs/scalars/' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
 
 
 def get_inputs_and_labels(d):
@@ -61,13 +67,14 @@ def train_model(hparams):
   model.compile(loss=loss, optimizer='adam', metrics=['acc'])
   print(model.summary())
 
-  X_train, y_train = get_inputs_and_labels(d_train)
-  X_test, y_test = get_inputs_and_labels(d_test)
-  history = model.fit(X_train, y_train, epochs=50, verbose=1,
-                      validation_data=(X_test, y_test))
+  x_train, y_train = get_inputs_and_labels(d_train)
+  x_test, y_test = get_inputs_and_labels(d_test)
+  history = model.fit(x_train, y_train, epochs=50, verbose=1,
+                      validation_data=(x_test, y_test),
+                      callbacks=[TensorBoard(log_dir=_scalars_log_dir())])
   plotting.plot_history(history)
 
-  loss_train, acc_train = model.evaluate(X_train, y_train, verbose=0)
-  loss_test, acc_test = model.evaluate(X_test, y_test, verbose=0)
+  loss_train, acc_train = model.evaluate(x_train, y_train, verbose=0)
+  loss_test, acc_test = model.evaluate(x_test, y_test, verbose=0)
   print('train: loss={} accuracy={}'.format(loss_train, acc_train))
   print('test: loss={} accuracy={}'.format(loss_test, acc_test))

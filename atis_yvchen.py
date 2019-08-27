@@ -26,7 +26,7 @@ def _make_id2token(token2id):
   return id2token
 
 
-class Dataset(object):  # pylint: disable=too-few-public-methods
+class Dataset:  # pylint: disable=too-few-public-methods
   """An ATIS dataset."""
   def __init__(self, filename, train_dataset=None):
     self.word_id_lists = []  # word lists (utterances), one per example

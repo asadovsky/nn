@@ -1,11 +1,5 @@
 # References
 
-## Next steps
-
-- Evaluate on test set
-- Plot accuracy and loss curves
-- TensorBoard
-
 ## TODO
 
 - Develop baseline intent classifiers
@@ -22,11 +16,11 @@
 ### Papers
 
 - https://www.csie.ntu.edu.tw/~yvchen/doc/IS16_MultiJoint.pdf
-- https://arxiv.org/pdf/1902.10909.pdf
 
 ### Other
 
 - https://github.com/yvchen/JointSLU
+- https://github.com/luheng/deep_srl
 - http://deeplearning.net/tutorial/rnnslu.html
 
 ## Embeddings
