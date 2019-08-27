@@ -21,7 +21,7 @@ def _proc_tokens(tokens, token2id, update_token2id):
 
 def _make_id2token(token2id):
   id2token = [''] * len(token2id)
-  for token, i in token2id.iteritems():
+  for token, i in iter(token2id.items()):
     id2token[i] = token
   return id2token
 
@@ -43,7 +43,7 @@ class Dataset(object):  # pylint: disable=too-few-public-methods
       self.tag2id = train_dataset.tag2id
       self.intent2id = train_dataset.intent2id
 
-    with open(filename, mode='rb') as f:
+    with open(filename) as f:
       for line in f:
         parts = line.split('\t')
         assert len(parts) == 2

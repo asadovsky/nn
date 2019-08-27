@@ -11,6 +11,7 @@ _GLOVE_PATH = 'data/glove/glove.6B.100d.txt'
 def _load_glove():
   """Loads GloVe word vectors."""
   word2vec = dict()
+  print('Loading GloVe word vectors from {}'.format(_GLOVE_PATH))
   with open(_GLOVE_PATH) as f:
     for line in f:
       parts = line.split()
@@ -21,8 +22,8 @@ def _load_glove():
 
 def _make_embedding_matrix(word2id, word2vec):
   """Makes an embedding matrix for the given words."""
-  input_dim = max(word2id.itervalues()) + 1
-  output_dim = len(word2vec.itervalues().next())
+  input_dim = max(iter(word2id.values())) + 1
+  output_dim = len(next(iter(word2vec.values())))
   embedding_matrix = np.zeros((input_dim, output_dim))
   for word, i in word2id.items():
     vec = word2vec.get(word)
@@ -33,7 +34,7 @@ def _make_embedding_matrix(word2id, word2vec):
 
 def make_rand_embedding(word2id, input_length):
   """Returns an Embedding with random word vectors."""
-  input_dim = max(word2id.itervalues()) + 1
+  input_dim = max(iter(word2id.values())) + 1
   output_dim = 8
   return Embedding(input_dim, output_dim, input_length=input_length)
 
@@ -41,8 +42,8 @@ def make_rand_embedding(word2id, input_length):
 def make_glove_embedding(word2id, input_length, trainable):
   """Returns an Embedding with GloVe word vectors."""
   word2vec = _load_glove()
-  input_dim = max(word2id.itervalues()) + 1
-  output_dim = len(word2vec.itervalues().next())
+  input_dim = max(iter(word2id.values())) + 1
+  output_dim = len(next(iter(word2vec.values())))
   embedding_matrix = _make_embedding_matrix(word2id, word2vec)
   return Embedding(input_dim, output_dim, weights=[embedding_matrix],
                    input_length=input_length, trainable=trainable)

@@ -1,8 +1,6 @@
 """Plotting libraries."""
 
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt  # pylint: disable=wrong-import-position
+import matplotlib.pyplot as plt
 
 
 def scatter(x, y):
