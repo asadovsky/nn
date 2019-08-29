@@ -31,8 +31,9 @@ INPUTS = ['Well done!',
 LABELS = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
 PAD_LEN = 4
 
-
 HParams = namedtuple('HParams', ['use_glove', 'categorical'])
+
+DEFAULT_HPARAMS = HParams(use_glove=False, categorical=True)
 
 
 def train_model(hparams):

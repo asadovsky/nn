@@ -21,12 +21,17 @@ import plotting
 np.random.seed(0)
 tf.set_random_seed(0)
 
-PAD_LEN = 32
 TRAIN_FILENAME = 'data/atis/atis.train.w-intent.iob'
 TEST_FILENAME = 'data/atis/atis.test.w-intent.iob'
+PAD_LEN = 32
 
+HParams = namedtuple('HParams', [
+    'embedding',  # glove, rand
+    'arch',        # max_pool, concat
+    'optimizer'  # adam
+])
 
-HParams = namedtuple('HParams', ['use_glove', 'max_pool'])
+DEFAULT_HPARAMS = HParams(embedding='glove', arch='concat', optimizer='adam')
 
 
 def _scalars_log_dir():
@@ -45,26 +50,39 @@ def train_model(hparams):
   d_train = atis_yvchen.Dataset(TRAIN_FILENAME)
   d_test = atis_yvchen.Dataset(TEST_FILENAME, train_dataset=d_train)
 
-  # TODO: Experiment with including embeddings for words that only occur in the
-  # test set. Note, though, that these wouldn't be fine-tuned during training.
+  # TODO: Include GloVe embeddings for words that only occur in the test set.
+  # Note, these won't be fine-tuned during training. Also, maybe generate random
+  # embeddings for training set words that don't have GloVe embeddings.
   embedding = None
-  if hparams.use_glove:
+  if hparams.embedding == 'glove':
     embedding = embedding_utils.make_glove_embedding(d_train.word2id, PAD_LEN,
                                                      True)
-  else:
+  elif hparams.embedding == 'rand':
     embedding = embedding_utils.make_rand_embedding(d_train.word2id, PAD_LEN)
+  else:
+    assert False, hparams.embedding
 
   num_classes = len(d_train.intent2id)
   loss = 'categorical_crossentropy'
 
   model = Sequential()
   model.add(embedding)
-  if hparams.max_pool:
+
+  if hparams.arch == 'concat':
+    model.add(Flatten())
+  elif hparams.arch == 'max_pool':
     model.add(GlobalMaxPool1D())
   else:
-    model.add(Flatten())
+    assert False, hparams.arch
+
   model.add(Dense(num_classes, activation='softmax'))
-  model.compile(loss=loss, optimizer='adam', metrics=['acc'])
+
+  optimizer = None
+  if hparams.optimizer != 'adam':
+    assert False, hparams.optimizer
+  optimizer = hparams.optimizer
+
+  model.compile(loss=loss, optimizer=optimizer, metrics=['acc'])
   print(model.summary())
 
   x_train, y_train = get_inputs_and_labels(d_train)
