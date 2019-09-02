@@ -27,8 +27,8 @@ PAD_LEN = 32
 
 HParams = namedtuple('HParams', [
     'embedding',  # glove, rand
-    'arch',        # max_pool, concat
-    'optimizer'  # adam
+    'arch',       # max_pool, concat
+    'optimizer'   # adam
 ])
 
 DEFAULT_HPARAMS = HParams(embedding='glove', arch='concat', optimizer='adam')
@@ -45,24 +45,20 @@ def get_inputs_and_labels(d):
   return inputs, labels
 
 
-def train_model(hparams):
-  """Trains a model."""
-  d_train = atis_yvchen.Dataset(TRAIN_FILENAME)
-  d_test = atis_yvchen.Dataset(TEST_FILENAME, train_dataset=d_train)
-
+def build_model(d, hparams):
+  """Builds a model."""
   # TODO: Include GloVe embeddings for words that only occur in the test set.
   # Note, these won't be fine-tuned during training. Also, maybe generate random
   # embeddings for training set words that don't have GloVe embeddings.
   embedding = None
   if hparams.embedding == 'glove':
-    embedding = embedding_utils.make_glove_embedding(d_train.word2id, PAD_LEN,
-                                                     True)
+    embedding = embedding_utils.make_glove_embedding(d.word2id, PAD_LEN, True)
   elif hparams.embedding == 'rand':
-    embedding = embedding_utils.make_rand_embedding(d_train.word2id, PAD_LEN)
+    embedding = embedding_utils.make_rand_embedding(d.word2id, PAD_LEN)
   else:
     assert False, hparams.embedding
 
-  num_classes = len(d_train.intent2id)
+  num_classes = len(d.intent2id)
   loss = 'categorical_crossentropy'
 
   model = Sequential()
@@ -83,6 +79,15 @@ def train_model(hparams):
   optimizer = hparams.optimizer
 
   model.compile(loss=loss, optimizer=optimizer, metrics=['acc'])
+  return model
+
+
+def train_model(hparams):
+  """Trains a model."""
+  d_train = atis_yvchen.Dataset(TRAIN_FILENAME)
+  d_test = atis_yvchen.Dataset(TEST_FILENAME, train_dataset=d_train)
+
+  model = build_model(d_train, hparams)
   print(model.summary())
 
   x_train, y_train = get_inputs_and_labels(d_train)
