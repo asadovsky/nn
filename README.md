@@ -16,6 +16,8 @@
 ### Papers
 
 - https://www.csie.ntu.edu.tw/~yvchen/doc/IS16_MultiJoint.pdf
+- https://www.aclweb.org/anthology/P17-1044
+- https://arxiv.org/pdf/1611.01436.pdf
 
 ### Other
 
@@ -26,6 +28,7 @@
 ## Embeddings
 
 - https://nlp.stanford.edu/projects/glove/
+- https://fasttext.cc/
 
 ## Formats
 
