@@ -62,7 +62,14 @@ def _scalars_log_dir():
 def get_inputs_and_labels(d, hp):
   inputs = pad_sequences(d.word_id_lists, maxlen=hp.pad_len, padding='post',
                          value=d.word2id[atis_yvchen.PAD])
-  labels = to_categorical(d.intent_ids, len(d.intent2id))
+  labels = None
+  if hp.mode == 'seq':
+    # TODO: Set labels appropriately.
+    pass
+  elif hp.mode == 'cls':
+    labels = to_categorical(d.intent_ids, len(d.intent2id))
+  else:
+    assert False, hp.mode
   return inputs, labels
 
 
@@ -100,9 +107,9 @@ def build_model(d, hp):
   if hp.dropout_rate > 0:
     model.add(Dropout(hp.dropout_rate))
 
-  if hp.mode == 'seq':  # Sequence tagging.
+  if hp.mode == 'seq':
     model.add(TimeDistributed(Dense(len(d.tag2id), activation='softmax')))
-  elif hp.mode == 'cls':  # Classification.
+  elif hp.mode == 'cls':
     if hp.cls_arch == 'flatten':
       model.add(Flatten())
     elif hp.cls_arch == 'max_pool':
