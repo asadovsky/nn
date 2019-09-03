@@ -5,8 +5,8 @@
 - Develop baseline intent classifiers
   - BiLSTM with GloVe embeddings
 - Develop baseline slot predictors
-  - BOW over n^2 spans, softmax across all span labels
-  - Use Viterbi algorithm during decoding
+  - Predict IOB tags; use Viterbi algorithm when decoding
+  - Predict labels for n^2 spans
 - Experiment
   - Character vs. word vs. WordPiece embeddings
   - FastText, ULMFiT, ELMo, BERT

@@ -2,20 +2,18 @@
 
 from __future__ import print_function
 import datetime
-from collections import namedtuple
 
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.callbacks import TensorBoard
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.layers import Flatten
-from tensorflow.keras.layers import GlobalMaxPool1D
+from tensorflow.keras.layers import Bidirectional, Dense, Dropout, Flatten, GlobalMaxPool1D, LSTM, TimeDistributed
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.utils import to_categorical
 
 import atis_yvchen
 import embedding_utils
+from params import Params
 import plotting
 
 np.random.seed(0)
@@ -25,13 +23,36 @@ TRAIN_FILENAME = 'data/atis/atis.train.w-intent.iob'
 TEST_FILENAME = 'data/atis/atis.test.w-intent.iob'
 PAD_LEN = 32
 
-HParams = namedtuple('HParams', [
-    'embedding',  # glove, rand
-    'arch',       # max_pool, concat
-    'optimizer'   # adam
-])
 
-DEFAULT_HPARAMS = HParams(embedding='glove', arch='concat', optimizer='adam')
+# TODO: Add pad_len hyperparam.
+def hparams_seq():
+  """Returns hyperparams for sequence processing."""
+  p = Params()
+  p.define('mode', 'seq',
+           'Sequence tagging or classification. Options: seq, cls.')
+  p.define('embedding', 'glove',
+           'Embedding type. Options: glove, rand.')
+  p.define('seq_arch', 'bilstm',
+           'Architecture for sequence processing. Used for both sequence'
+           ' tagging and classification. Options: none, lstm, bilstm.')
+  p.define('cls_arch', None,
+           'Architecture for classification. Used only for classification.'
+           ' Options: flatten, max_pool.')
+  p.define('hidden_dim', 50,
+           'Size of hidden sequence processing layer.')
+  p.define('dropout_rate', 0,
+           'Dropout rate. If 0, we disable dropout.')
+  p.define('optimizer', 'adam',
+           'The optimizer to use. Options: adam.')
+  return p
+
+
+def hparams_cls():
+  p = hparams_seq()
+  p.mode = 'cls'
+  p.seq_arch = 'none'
+  p.cls_arch = 'flatten'
+  return p
 
 
 def _scalars_log_dir():
@@ -45,49 +66,69 @@ def get_inputs_and_labels(d):
   return inputs, labels
 
 
-def build_model(d, hparams):
+def build_model(d, hp):
   """Builds a model."""
-  # TODO: Include GloVe embeddings for words that only occur in the test set.
-  # Note, these won't be fine-tuned during training. Also, maybe generate random
-  # embeddings for training set words that don't have GloVe embeddings.
+  model = Sequential()
+
+  # TODO:
+  # - Include GloVe embeddings for words that only occur in the test set. Note,
+  #   these won't be fine-tuned during training.
+  # - Maybe generate random embeddings for training set words that don't have
+  #   GloVe embeddings.
   embedding = None
-  if hparams.embedding == 'glove':
+  if hp.embedding == 'glove':
     embedding = embedding_utils.make_glove_embedding(d.word2id, PAD_LEN, True)
-  elif hparams.embedding == 'rand':
+  elif hp.embedding == 'rand':
     embedding = embedding_utils.make_rand_embedding(d.word2id, PAD_LEN)
   else:
-    assert False, hparams.embedding
+    assert False, hp.embedding
 
-  num_classes = len(d.intent2id)
-  loss = 'categorical_crossentropy'
-
-  model = Sequential()
   model.add(embedding)
 
-  if hparams.arch == 'concat':
-    model.add(Flatten())
-  elif hparams.arch == 'max_pool':
-    model.add(GlobalMaxPool1D())
+  if hp.seq_arch == 'none':
+    pass
+  elif hp.seq_arch.endswith('lstm'):
+    layer = LSTM(hp.hidden_dim, return_sequences=True)
+    if hp.seq_arch == 'bilstm':
+      layer = Bidirectional(layer)
+    else:
+      assert hp.seq_arch == 'lstm'
+    model.add(layer)
   else:
-    assert False, hparams.arch
+    assert False, hp.arch
 
-  model.add(Dense(num_classes, activation='softmax'))
+  if hp.dropout_rate > 0:
+    model.add(Dropout(hp.dropout_rate))
+
+  if hp.mode == 'seq':  # Sequence tagging.
+    model.add(TimeDistributed(Dense(len(d.tag2id), activation='softmax')))
+  elif hp.mode == 'cls':  # Classification.
+    if hp.cls_arch == 'flatten':
+      model.add(Flatten())
+    elif hp.cls_arch == 'max_pool':
+      model.add(GlobalMaxPool1D())
+    else:
+      assert False, hp.cls_arch
+    model.add(Dense(len(d.intent2id), activation='softmax'))
+  else:
+    assert False, hp.mode
 
   optimizer = None
-  if hparams.optimizer != 'adam':
-    assert False, hparams.optimizer
-  optimizer = hparams.optimizer
+  if hp.optimizer != 'adam':
+    assert False, hp.optimizer
+  optimizer = hp.optimizer
 
-  model.compile(loss=loss, optimizer=optimizer, metrics=['acc'])
+  model.compile(loss='categorical_crossentropy', optimizer=optimizer,
+                metrics=['acc'])
   return model
 
 
-def train_model(hparams):
+def train_model(hp):
   """Trains a model."""
   d_train = atis_yvchen.Dataset(TRAIN_FILENAME)
   d_test = atis_yvchen.Dataset(TEST_FILENAME, train_dataset=d_train)
 
-  model = build_model(d_train, hparams)
+  model = build_model(d_train, hp)
   print(model.summary())
 
   x_train, y_train = get_inputs_and_labels(d_train)

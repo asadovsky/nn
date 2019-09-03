@@ -36,6 +36,7 @@ def make_rand_embedding(word2id, input_length):
   """Returns an Embedding with random word vectors."""
   input_dim = max(iter(word2id.values())) + 1
   output_dim = 8
+  # TODO: Set mask_zero=True.
   return Embedding(input_dim, output_dim, input_length=input_length)
 
 
@@ -45,5 +46,6 @@ def make_glove_embedding(word2id, input_length, trainable):
   input_dim = max(iter(word2id.values())) + 1
   output_dim = len(next(iter(word2vec.values())))
   embedding_matrix = _make_embedding_matrix(word2id, word2vec)
+  # TODO: Set mask_zero=True.
   return Embedding(input_dim, output_dim, weights=[embedding_matrix],
                    input_length=input_length, trainable=trainable)

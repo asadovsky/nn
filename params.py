@@ -52,7 +52,7 @@ class Params:
     try:
       return self._params[name].get()
     except KeyError:
-      raise AttributeError(name)
+      raise AttributeError(name) from None
 
   def __setattr__(self, name, value):
     if name == '_params':
@@ -61,7 +61,7 @@ class Params:
       try:
         self._params[name].set(value)
       except KeyError:
-        raise AttributeError(name)
+        raise AttributeError(name) from None
 
   def __dir__(self):
     return sorted(self._params.keys())
@@ -118,7 +118,7 @@ class Params:
           return param
         curr = param.get()
       except KeyError:
-        raise AttributeError('.'.join(parts[:i+1]))
+        raise AttributeError('.'.join(parts[:i+1])) from None
     return None
 
   def get(self, name):

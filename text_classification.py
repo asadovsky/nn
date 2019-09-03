@@ -5,8 +5,7 @@ from collections import namedtuple
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Dense, Flatten
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
@@ -36,7 +35,7 @@ HParams = namedtuple('HParams', ['use_glove', 'categorical'])
 DEFAULT_HPARAMS = HParams(use_glove=False, categorical=True)
 
 
-def train_model(hparams):
+def train_model(hp):
   """Trains a model."""
   t = Tokenizer()
   t.fit_on_texts(INPUTS)
@@ -44,7 +43,7 @@ def train_model(hparams):
   padded_inputs = pad_sequences(encoded_inputs, maxlen=PAD_LEN, padding='post')
 
   embedding = None
-  if hparams.use_glove:
+  if hp.use_glove:
     embedding = embedding_utils.make_glove_embedding(t.word_index, PAD_LEN,
                                                      False)
   else:
@@ -53,14 +52,14 @@ def train_model(hparams):
   num_classes = len(set(LABELS))
   labels = LABELS
   loss = 'binary_crossentropy'
-  if hparams.categorical:
+  if hp.categorical:
     labels = to_categorical(LABELS, num_classes)
     loss = 'categorical_crossentropy'
 
   model = Sequential()
   model.add(embedding)
   model.add(Flatten())
-  if hparams.categorical:
+  if hp.categorical:
     model.add(Dense(num_classes, activation='softmax'))
   else:
     model.add(Dense(1, activation='sigmoid'))
