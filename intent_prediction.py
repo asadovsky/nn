@@ -131,8 +131,8 @@ def train_model(hp):
   model = build_model(d_train, hp)
   print(model.summary())
 
-  x_train, y_train = get_inputs_and_labels(d_train)
-  x_test, y_test = get_inputs_and_labels(d_test)
+  x_train, y_train = get_inputs_and_labels(d_train, hp)
+  x_test, y_test = get_inputs_and_labels(d_test, hp)
   history = model.fit(x_train, y_train, epochs=50, verbose=1,
                       validation_data=(x_test, y_test),
                       callbacks=[TensorBoard(log_dir=_scalars_log_dir())])

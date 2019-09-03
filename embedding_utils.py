@@ -45,7 +45,7 @@ def glove_embedding(word2id, input_length, trainable):
   word2vec = _load_glove()
   input_dim = max(iter(word2id.values())) + 1
   output_dim = len(next(iter(word2vec.values())))
-  embedding_matrix = _make_embedding_matrix(word2id, word2vec)
+  embedding_matrix = _embedding_matrix(word2id, word2vec)
   # TODO: Set mask_zero=True.
   return Embedding(input_dim, output_dim, weights=[embedding_matrix],
                    input_length=input_length, trainable=trainable)
