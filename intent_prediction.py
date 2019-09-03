@@ -21,15 +21,15 @@ tf.set_random_seed(0)
 
 TRAIN_FILENAME = 'data/atis/atis.train.w-intent.iob'
 TEST_FILENAME = 'data/atis/atis.test.w-intent.iob'
-PAD_LEN = 32
 
 
-# TODO: Add pad_len hyperparam.
 def hparams_seq():
   """Returns hyperparams for sequence processing."""
   p = Params()
   p.define('mode', 'seq',
            'Sequence tagging or classification. Options: seq, cls.')
+  p.define('pad_len', 32,
+           'Maximum sequence length.')
   p.define('embedding', 'glove',
            'Embedding type. Options: glove, rand.')
   p.define('seq_arch', 'bilstm',
@@ -59,8 +59,8 @@ def _scalars_log_dir():
   return 'logs/scalars/' + datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
 
 
-def get_inputs_and_labels(d):
-  inputs = pad_sequences(d.word_id_lists, maxlen=PAD_LEN, padding='post',
+def get_inputs_and_labels(d, hp):
+  inputs = pad_sequences(d.word_id_lists, maxlen=hp.pad_len, padding='post',
                          value=d.word2id[atis_yvchen.PAD])
   labels = to_categorical(d.intent_ids, len(d.intent2id))
   return inputs, labels
@@ -77,9 +77,9 @@ def build_model(d, hp):
   #   GloVe embeddings.
   embedding = None
   if hp.embedding == 'glove':
-    embedding = embedding_utils.make_glove_embedding(d.word2id, PAD_LEN, True)
+    embedding = embedding_utils.glove_embedding(d.word2id, hp.pad_len, True)
   elif hp.embedding == 'rand':
-    embedding = embedding_utils.make_rand_embedding(d.word2id, PAD_LEN)
+    embedding = embedding_utils.rand_embedding(d.word2id, hp.pad_len)
   else:
     assert False, hp.embedding
 

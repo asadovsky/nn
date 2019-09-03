@@ -44,10 +44,9 @@ def train_model(hp):
 
   embedding = None
   if hp.use_glove:
-    embedding = embedding_utils.make_glove_embedding(t.word_index, PAD_LEN,
-                                                     False)
+    embedding = embedding_utils.glove_embedding(t.word_index, PAD_LEN, False)
   else:
-    embedding = embedding_utils.make_rand_embedding(t.word_index, PAD_LEN)
+    embedding = embedding_utils.rand_embedding(t.word_index, PAD_LEN)
 
   num_classes = len(set(LABELS))
   labels = LABELS
