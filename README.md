@@ -2,12 +2,11 @@
 
 ## TODO
 
-- Develop baseline intent classifiers
-  - BiLSTM with GloVe embeddings
-- Develop baseline slot predictors
+- Develop baselines for slot prediction
   - Predict IOB tags; use Viterbi algorithm when decoding
   - Predict labels for n^2 spans
 - Experiment
+  - Joint (or pipelined) prediction of intent and slots
   - Character vs. word vs. WordPiece embeddings
   - FastText, ULMFiT, ELMo, BERT
 
@@ -16,8 +15,10 @@
 ### Papers
 
 - https://www.csie.ntu.edu.tw/~yvchen/doc/IS16_MultiJoint.pdf
-- https://www.aclweb.org/anthology/P17-1044
 - https://arxiv.org/pdf/1611.01436.pdf
+- https://aclweb.org/anthology/P17-1044
+- https://aclweb.org/anthology/P18-2058
+- https://arxiv.org/pdf/1810.02245.pdf
 
 ### Other
 

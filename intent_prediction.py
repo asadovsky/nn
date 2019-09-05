@@ -60,12 +60,17 @@ def _scalars_log_dir():
 
 
 def get_inputs_and_labels(d, hp):
+  """Returns model inputs and labels, i.e. x and y."""
   inputs = pad_sequences(d.word_id_lists, maxlen=hp.pad_len, padding='post',
                          value=d.word2id[atis_yvchen.PAD])
   labels = None
   if hp.mode == 'seq':
-    # TODO: Set labels appropriately.
-    pass
+    padded_tag_id_lists = pad_sequences(
+        d.tag_id_lists, maxlen=hp.pad_len, padding='post',
+        value=d.tag2id[atis_yvchen.PAD])
+    # One-hot encoding.
+    labels = np.array([to_categorical(tag_ids, len(d.tag2id))
+                       for tag_ids in padded_tag_id_lists])
   elif hp.mode == 'cls':
     labels = to_categorical(d.intent_ids, len(d.intent2id))
   else:
@@ -84,9 +89,9 @@ def build_model(d, hp):
   #   GloVe embeddings.
   embedding = None
   if hp.embedding == 'glove':
-    embedding = embedding_utils.glove_embedding(d.word2id, hp.pad_len, True)
+    embedding = embedding_utils.glove_embedding(d.id2word, hp.pad_len, True)
   elif hp.embedding == 'rand':
-    embedding = embedding_utils.rand_embedding(d.word2id, hp.pad_len)
+    embedding = embedding_utils.rand_embedding(d.id2word, hp.pad_len)
   else:
     assert False, hp.embedding
 

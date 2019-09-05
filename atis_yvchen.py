@@ -37,7 +37,7 @@ class Dataset:  # pylint: disable=too-few-public-methods
     is_train = train_dataset is None
     if is_train:
       self.word2id = {PAD: 0, UNK: 1}
-      self.tag2id = {UNK: 0}
+      self.tag2id = {PAD: 0, UNK: 1}
       self.intent2id = {UNK: 0}
     else:
       self.word2id = train_dataset.word2id

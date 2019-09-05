@@ -20,32 +20,32 @@ def _load_glove():
   return word2vec
 
 
-def _embedding_matrix(word2id, word2vec):
+def _embedding_matrix(id2word, word2vec):
   """Makes an embedding matrix for the given words."""
-  input_dim = max(iter(word2id.values())) + 1
+  input_dim = len(id2word)
   output_dim = len(next(iter(word2vec.values())))
   embedding_matrix = np.zeros((input_dim, output_dim))
-  for word, i in word2id.items():
+  for i, word in enumerate(id2word):
     vec = word2vec.get(word)
     if vec is not None:
       embedding_matrix[i] = vec
   return embedding_matrix
 
 
-def rand_embedding(word2id, input_length):
+def rand_embedding(id2word, input_length):
   """Returns an Embedding with random word vectors."""
-  input_dim = max(iter(word2id.values())) + 1
+  input_dim = len(id2word)
   output_dim = 8
   # TODO: Set mask_zero=True.
   return Embedding(input_dim, output_dim, input_length=input_length)
 
 
-def glove_embedding(word2id, input_length, trainable):
+def glove_embedding(id2word, input_length, trainable):
   """Returns an Embedding with GloVe word vectors."""
   word2vec = _load_glove()
-  input_dim = max(iter(word2id.values())) + 1
+  input_dim = len(id2word)
   output_dim = len(next(iter(word2vec.values())))
-  embedding_matrix = _embedding_matrix(word2id, word2vec)
+  embedding_matrix = _embedding_matrix(id2word, word2vec)
   # TODO: Set mask_zero=True.
   return Embedding(input_dim, output_dim, weights=[embedding_matrix],
                    input_length=input_length, trainable=trainable)

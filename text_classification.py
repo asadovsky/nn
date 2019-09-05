@@ -28,6 +28,9 @@ INPUTS = ['Well done!',
           'poor work',
           'Could have done better.']
 LABELS = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
+
+PAD = '<pad>'
+UNK = '<unk>'
 PAD_LEN = 4
 
 HParams = namedtuple('HParams', ['use_glove', 'categorical'])
@@ -37,16 +40,19 @@ DEFAULT_HPARAMS = HParams(use_glove=False, categorical=True)
 
 def train_model(hp):
   """Trains a model."""
-  t = Tokenizer()
+  t = Tokenizer(oov_token=UNK)
   t.fit_on_texts(INPUTS)
+  id2word = [PAD] + list(t.index_word.values())
+  word2id = {v: i for i, v in enumerate(id2word)}
   encoded_inputs = t.texts_to_sequences(INPUTS)
-  padded_inputs = pad_sequences(encoded_inputs, maxlen=PAD_LEN, padding='post')
+  padded_inputs = pad_sequences(encoded_inputs, maxlen=PAD_LEN, padding='post',
+                                value=word2id[PAD])
 
   embedding = None
   if hp.use_glove:
-    embedding = embedding_utils.glove_embedding(t.word_index, PAD_LEN, False)
+    embedding = embedding_utils.glove_embedding(id2word, PAD_LEN, False)
   else:
-    embedding = embedding_utils.rand_embedding(t.word_index, PAD_LEN)
+    embedding = embedding_utils.rand_embedding(id2word, PAD_LEN)
 
   num_classes = len(set(LABELS))
   labels = LABELS
