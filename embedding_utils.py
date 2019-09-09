@@ -32,20 +32,21 @@ def _embedding_matrix(id2word, word2vec):
   return embedding_matrix
 
 
-def rand_embedding(id2word, input_length):
+def rand_embedding(id2word, mask_zero=False, input_length=None):
   """Returns an Embedding with random word vectors."""
   input_dim = len(id2word)
   output_dim = 8
-  # TODO: Set mask_zero=True.
-  return Embedding(input_dim, output_dim, input_length=input_length)
+  return Embedding(input_dim, output_dim, mask_zero=mask_zero,
+                   input_length=input_length)
 
 
-def glove_embedding(id2word, input_length, trainable):
+def glove_embedding(id2word, mask_zero=False, input_length=None,
+                    trainable=False):
   """Returns an Embedding with GloVe word vectors."""
   word2vec = _load_glove()
   input_dim = len(id2word)
   output_dim = len(next(iter(word2vec.values())))
   embedding_matrix = _embedding_matrix(id2word, word2vec)
-  # TODO: Set mask_zero=True.
   return Embedding(input_dim, output_dim, weights=[embedding_matrix],
-                   input_length=input_length, trainable=trainable)
+                   mask_zero=mask_zero, input_length=input_length,
+                   trainable=trainable)

@@ -50,9 +50,9 @@ def train_model(hp):
 
   embedding = None
   if hp.use_glove:
-    embedding = embedding_utils.glove_embedding(id2word, PAD_LEN, False)
+    embedding = embedding_utils.glove_embedding(id2word, input_length=PAD_LEN)
   else:
-    embedding = embedding_utils.rand_embedding(id2word, PAD_LEN)
+    embedding = embedding_utils.rand_embedding(id2word, input_length=PAD_LEN)
 
   num_classes = len(set(LABELS))
   labels = LABELS

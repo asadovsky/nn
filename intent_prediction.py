@@ -23,7 +23,7 @@ TRAIN_FILENAME = 'data/atis/atis.train.w-intent.iob'
 TEST_FILENAME = 'data/atis/atis.test.w-intent.iob'
 
 
-def hparams_seq():
+def hparams_seq(**kwargs):
   """Returns hyperparams for sequence processing."""
   p = Params()
   p.define('mode', 'seq',
@@ -44,14 +44,16 @@ def hparams_seq():
            'Dropout rate. If 0, we disable dropout.')
   p.define('optimizer', 'adam',
            'The optimizer to use. Options: adam.')
+  p.set(**kwargs)
   return p
 
 
-def hparams_cls():
+def hparams_cls(**kwargs):
   p = hparams_seq()
   p.mode = 'cls'
   p.seq_arch = 'none'
   p.cls_arch = 'flatten'
+  p.set(**kwargs)
   return p
 
 
@@ -87,11 +89,14 @@ def build_model(d, hp):
   #   these won't be fine-tuned during training.
   # - Maybe generate random embeddings for training set words that don't have
   #   GloVe embeddings.
+  mask_zero = hp.mode == 'seq'
   embedding = None
   if hp.embedding == 'glove':
-    embedding = embedding_utils.glove_embedding(d.id2word, hp.pad_len, True)
+    embedding = embedding_utils.glove_embedding(
+        d.id2word, mask_zero=mask_zero, input_length=hp.pad_len, trainable=True)
   elif hp.embedding == 'rand':
-    embedding = embedding_utils.rand_embedding(d.id2word, hp.pad_len)
+    embedding = embedding_utils.rand_embedding(
+        d.id2word, mask_zero=mask_zero, input_length=hp.pad_len)
   else:
     assert False, hp.embedding
 
