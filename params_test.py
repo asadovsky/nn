@@ -8,7 +8,7 @@ from params import Params
 class TestParams(unittest.TestCase):
   """Tests for Params class."""
 
-  def test_equals(self):
+  def test_eq_ne(self):
     """Tests equality methods."""
     a = Params()
     b = Params()
@@ -21,6 +21,9 @@ class TestParams(unittest.TestCase):
     self.assertNotEqual(a, b)
     a.x = 0
     self.assertEqual(a, b)
+    c = Params()
+    c.define('y', 0, '')
+    self.assertNotEqual(b, c)
 
   def test_get_set_has(self):
     """Tests get, set, and has methods."""
@@ -50,6 +53,12 @@ class TestParams(unittest.TestCase):
     self.assertEqual(p.description('y'), '')
     self.assertRaises(AttributeError, lambda: p.description('z'))
 
+  def test_double_define(self):
+    """Tests that defining the same parameter twice fails."""
+    p = Params()
+    p.define('x', 0, '')
+    self.assertRaises(AttributeError, lambda: p.define('x', 0, ''))
+
   def test_nested(self):
     """Tests for nested Params."""
     a = Params()
@@ -61,7 +70,7 @@ class TestParams(unittest.TestCase):
     self.assertEqual(str(a), '{\n  x: 0\n  y: {\n    z: 1\n  }\n}')
     self.assertRaises(AttributeError, lambda: a.get('w'))
     self.assertEqual(a.get('x'), 0)
-    self.assertRaises(AttributeError, lambda: a.get('x.y'))
+    self.assertEqual(type(a.get('y')), Params)
     self.assertRaises(AttributeError, lambda: a.get('y.w'))
     self.assertEqual(a.get('y.z'), 1)
     self.assertRaises(AttributeError, lambda: a.get('y.z.w'))

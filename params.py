@@ -7,28 +7,24 @@ import six
 class _Param:
   """A parameter."""
 
-  def __init__(self, name, default_value, description):
-    self._name = name
+  def __init__(self, default_value, description):
     self._value = default_value
     self._description = description
 
   def __eq__(self, other):
     # pylint: disable=protected-access
-    return self._name == other._name and self._value == other._value
+    return self._value == other._value
 
   def __ne__(self, other):
     return not self == other
 
-  def to_string(self, nested_depth):
-    """Returns a string representation of this parameter."""
+  def to_string(self, depth):
     if isinstance(self._value, Params):
       # pylint: disable=protected-access
-      value_str = self._value._to_string(nested_depth)
-    elif isinstance(self._value, six.string_types):
-      value_str = '"%s"' % str(self._value)
-    else:
-      value_str = str(self._value)
-    return '%s%s: %s' % ('  ' * nested_depth, self._name, value_str)
+      return self._value._to_string(depth)
+    if isinstance(self._value, six.string_types):
+      return '"%s"' % str(self._value)
+    return str(self._value)
 
   def set(self, value):
     self._value = value
@@ -64,7 +60,7 @@ class Params:
         raise AttributeError(name) from None
 
   def __dir__(self):
-    return sorted(self._params.keys())
+    return self._params.keys()
 
   def __eq__(self, other):
     # pylint: disable=protected-access
@@ -73,12 +69,10 @@ class Params:
   def __ne__(self, other):
     return not self == other
 
-  def _to_string(self, nested_depth):
-    sorted_param_strs = [
-        v.to_string(nested_depth + 1)
-        for (_, v) in sorted(six.iteritems(self._params))
-    ]
-    return '{\n%s\n%s}' % ('\n'.join(sorted_param_strs), '  ' * nested_depth)
+  def _to_string(self, depth):
+    param_strs = ['%s%s: %s' % ('  ' * (depth + 1), k, v.to_string(depth + 1))
+                  for k, v in six.iteritems(self._params)]
+    return '{\n%s\n%s}' % ('\n'.join(sorted(param_strs)), '  ' * depth)
 
   def __str__(self):
     return self._to_string(0)
@@ -103,7 +97,7 @@ class Params:
             re.match('^[a-z][a-z0-9_]*$', name) is not None)
     if name in self._params:
       raise AttributeError('Parameter is already defined: %s' % name)
-    self._params[name] = _Param(name, default_value, description)
+    self._params[name] = _Param(default_value, description)
 
   def _get_nested(self, name):
     """Returns the specified parameter."""
