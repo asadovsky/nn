@@ -2,8 +2,10 @@
 
 ## TODO
 
+- Eval infra
+  - https://github.com/chakki-works/seqeval
 - Develop baselines for slot prediction
-  - Predict IOB tags; use Viterbi algorithm when decoding
+  - Use Viterbi algorithm when decoding IOB tag predictions
   - Predict labels for n^2 spans
 - Experiment
   - Joint (or pipelined) prediction of intent and slots
