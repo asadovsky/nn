@@ -182,10 +182,10 @@ def train_model(model, d_train, d_test, hp):
 def evaluate_model(prefix, model, d, x, y, hp):
   """Evaluates a model."""
   loss, acc = model.evaluate(x, y, verbose=0)
-  print('{} loss={} accuracy={}'.format(prefix, loss, acc))
+  print('{} loss={:.4f} accuracy={:.4f}'.format(prefix, loss, acc))
   if hp.mode == 'seq':
     y_true, y_pred = true_iob_seqs(d, hp), pred_iob_seqs(model.predict(x), d)
-    print('{} seq.accuracy={} seq.f1={}'.format(
+    print('{} seq.accuracy={:.4f} seq.f1={:.4f}'.format(
         prefix, accuracy_score(y_true, y_pred), f1_score(y_true, y_pred)))
 
 

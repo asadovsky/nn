@@ -73,4 +73,4 @@ def train_model(hp):
   print(model.summary())
   model.fit(padded_inputs, labels, epochs=50, verbose=0)
   loss, acc = model.evaluate(padded_inputs, labels, verbose=0)
-  print('loss={} accuracy={}'.format(loss, acc))
+  print('loss={:.4f} accuracy={:.4f}'.format(loss, acc))
