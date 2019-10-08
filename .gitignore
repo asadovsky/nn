@@ -1,5 +1,4 @@
 *.pyc
-checkpoints
 data/**/*.pkl
 data/**/*.txt
-logs
+runs

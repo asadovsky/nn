@@ -32,6 +32,7 @@ LABELS = [1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
 PAD = '<pad>'
 UNK = '<unk>'
 PAD_LEN = 4
+EMBEDDING_OUTPUT_DIM = 50
 
 HParams = namedtuple('HParams', ['use_glove', 'categorical'])
 
@@ -50,9 +51,11 @@ def train_model(hp):
 
   embedding = None
   if hp.use_glove:
-    embedding = embedding_utils.glove_embedding(id2word, input_length=PAD_LEN)
+    embedding = embedding_utils.glove_embedding(
+        id2word, EMBEDDING_OUTPUT_DIM, input_length=PAD_LEN)
   else:
-    embedding = embedding_utils.rand_embedding(id2word, input_length=PAD_LEN)
+    embedding = embedding_utils.rand_embedding(
+        id2word, EMBEDDING_OUTPUT_DIM, input_length=PAD_LEN)
 
   num_classes = len(set(LABELS))
   labels = LABELS

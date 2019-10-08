@@ -1,7 +1,9 @@
 """ATIS intent prediction."""
 
 from __future__ import print_function
+from collections import OrderedDict
 import datetime
+import itertools
 import os
 
 import numpy as np
@@ -28,7 +30,7 @@ TEST_FILENAME = 'data/atis/atis.test.w-intent.iob'
 def hparams_seq(**kwargs):
   """Returns hyperparams for sequence processing."""
   p = Params()
-  p.define('id', None,
+  p.define('run_id', None,
            'String identifier for this run.')
   p.define('mode', 'seq',
            'Sequence tagging or classification. Options: seq, cls.')
@@ -38,6 +40,12 @@ def hparams_seq(**kwargs):
            'Options: pre, post.')
   p.define('embedding', 'glove',
            'Embedding type. Options: glove, rand.')
+  p.define('embedding_output_dim', 50,
+           'Size of the embedding.')
+  p.define('train_embedding', True,
+           'Whether to update embeddings during training.')
+  p.define('include_test_vocab', True,
+           'Whether the embedding matrix should include test set words.')
   p.define('seq_arch', 'bilstm',
            'Architecture for sequence processing. Used for both sequence'
            ' tagging and classification. Options: none, lstm, bilstm.')
@@ -63,6 +71,14 @@ def hparams_cls(**kwargs):
   p.cls_arch = 'flatten'
   p.set(**kwargs)
   return p
+
+
+def _checkpoints_dir(run_id):
+  return 'runs/' + run_id + '/checkpoints'
+
+
+def _logs_dir(run_id):
+  return 'runs/' + run_id + '/logs'
 
 
 def inputs_and_labels(d, hp):
@@ -108,19 +124,18 @@ def build_model(d, hp):
   """Builds a model."""
   model = Sequential()
 
-  # TODO:
-  # - Include GloVe embeddings for words that only occur in the test set. Note,
-  #   these won't be fine-tuned during training.
-  # - Maybe generate random embeddings for training set words that don't have
-  #   GloVe embeddings.
+  # TODO: Maybe generate random embeddings for training set words that don't
+  # have GloVe embeddings.
   mask_zero = hp.mode == 'seq'
   embedding = None
   if hp.embedding == 'glove':
     embedding = embedding_utils.glove_embedding(
-        d.id2word, mask_zero=mask_zero, input_length=hp.pad_len, trainable=True)
+        d.id2word, hp.embedding_output_dim, mask_zero=mask_zero,
+        input_length=hp.pad_len, trainable=hp.train_embedding)
   elif hp.embedding == 'rand':
     embedding = embedding_utils.rand_embedding(
-        d.id2word, mask_zero=mask_zero, input_length=hp.pad_len)
+        d.id2word, hp.embedding_output_dim, mask_zero=mask_zero,
+        input_length=hp.pad_len, trainable=hp.train_embedding)
   else:
     assert False, hp.embedding
 
@@ -170,8 +185,8 @@ def train_model(model, d_train, d_test, hp):
   x_test, y_test = inputs_and_labels(d_test, hp)
   callbacks = [
       ModelCheckpoint(
-          'checkpoints/' + hp.id + '/{epoch:03d}-{val_loss:.4f}.hdf5'),
-      TensorBoard(log_dir=('logs/' + hp.id))
+          _checkpoints_dir(hp.run_id) + '/{epoch:03d}-{val_loss:.4f}.hdf5'),
+      TensorBoard(log_dir=_logs_dir(hp.run_id))
   ]
   history = model.fit(x_train, y_train, epochs=hp.epochs, verbose=1,
                       validation_data=(x_test, y_test),
@@ -191,27 +206,42 @@ def evaluate_model(prefix, model, d, x, y, hp):
 
 def train_and_evaluate_model(hp):
   """Trains and evaluates a model."""
-  hp.set(id=datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))
-  os.makedirs('checkpoints/' + hp.id, exist_ok=True)
-  os.makedirs('logs/' + hp.id, exist_ok=True)
+  hp.set(run_id=datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))
+  # TODO: Record hyperparams.
+  for path in [_checkpoints_dir(hp.run_id), _logs_dir(hp.run_id)]:
+    os.makedirs(path, exist_ok=True)
+
   d_train = atis_yvchen.Dataset(TRAIN_FILENAME)
-  d_test = atis_yvchen.Dataset(TEST_FILENAME, train_dataset=d_train)
+  if hp.include_test_vocab:
+    d_train.extend_vocab(TEST_FILENAME)
+  d_test = atis_yvchen.Dataset(TEST_FILENAME, vocab_dataset=d_train)
+
   model = build_model(d_train, hp)
   print(model.summary())
+
   x_train, y_train, x_test, y_test, history = train_model(
       model, d_train, d_test, hp)
+
   plotting.plot_history(history)
   evaluate_model('train', model, d_train, x_train, y_train, hp)
   evaluate_model('test', model, d_test, x_test, y_test, hp)
 
 
 def grid_search(hp=None):
+  """Runs grid search."""
   if hp is None:
     hp = hparams_seq()
-  for dropout_rate in [0, 0.1, 0.2, 0.5]:
-    hp.set(dropout_rate=dropout_rate)
+  grid = OrderedDict([
+      ('embedding', ['glove']),
+      ('train_embedding', [True]),
+      ('include_test_vocab', [True]),
+      ('dropout_rate', [0.2])
+  ])
+  for values in itertools.product(*grid.values()):
+    params = dict(zip(grid.keys(), values))
     print('\n' * 5)
     print('=' * 40)
-    print('dropout_rate={}'.format(dropout_rate))
+    print(params)
     print('=' * 40)
+    hp.set(**params)
     train_and_evaluate_model(hp)
