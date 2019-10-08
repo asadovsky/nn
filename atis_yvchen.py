@@ -30,9 +30,9 @@ class Dataset:  # pylint: disable=too-few-public-methods
   """An ATIS dataset."""
 
   def __init__(self, filename, train_dataset=None):
-    self.word_id_lists = []  # word lists (utterances), one per example
-    self.tag_id_lists = []   # IOB tag lists, one per example
-    self.intent_ids = []     # intents, one per example
+    self.word_id_seqs = []  # word seqs (utterances), one per example
+    self.tag_id_seqs = []   # IOB tag seqs, one per example
+    self.intent_ids = []    # intents, one per example
 
     is_train = train_dataset is None
     if is_train:
@@ -51,14 +51,14 @@ class Dataset:  # pylint: disable=too-few-public-methods
         words = parts[0].strip().split()
         tags = parts[1].strip().split()
         assert len(words) == len(tags)
-        self.word_id_lists.append(
+        self.word_id_seqs.append(
             _proc_tokens(words, self.word2id, is_train))
-        # Replace the intent name with 'O' in the tag list so that the word and
-        # tag lists have the same length.
+        # Replace the intent name with 'O' in the tag seq so that the word and
+        # tag seqs have the same length.
         # TODO: Add an option to keep the intent name as the final tag, which
         # corresponds to the final word ('EOS'), so we can jointly predict the
         # tags and intent as done in the yvchen paper.
-        self.tag_id_lists.append(
+        self.tag_id_seqs.append(
             _proc_tokens(tags[:-1] + ['O'], self.tag2id, is_train))
         self.intent_ids.append(
             _proc_tokens([tags[-1]], self.intent2id, is_train)[0])

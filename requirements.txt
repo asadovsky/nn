@@ -2,4 +2,5 @@ ipython
 matplotlib
 numpy
 pylint
+seqeval
 tensorflow
