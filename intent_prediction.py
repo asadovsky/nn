@@ -205,10 +205,13 @@ def train_and_evaluate_model(hp):
   evaluate_model('test', model, d_test, x_test, y_test, hp)
 
 
-def grid_search():
+def grid_search(hp=None):
+  if hp is None:
+    hp = hparams_seq()
   for dropout_rate in [0, 0.1, 0.2, 0.5]:
+    hp.set(dropout_rate=dropout_rate)
     print('\n' * 5)
     print('=' * 40)
     print('dropout_rate={}'.format(dropout_rate))
     print('=' * 40)
-    train_and_evaluate_model(hparams_seq(dropout_rate=dropout_rate))
+    train_and_evaluate_model(hp)
