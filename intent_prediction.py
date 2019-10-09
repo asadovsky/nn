@@ -73,12 +73,26 @@ def hparams_cls(**kwargs):
   return p
 
 
+def _run_dir(run_id):
+  return os.path.join('runs', run_id)
+
+
+def _hyperparams_filepath(run_id):
+  return os.path.join(_run_dir(run_id), 'hyperparams.txt')
+
+
+def _record_hyperparams(hp):
+  os.makedirs(_run_dir(hp.run_id), exist_ok=True)
+  with open(_hyperparams_filepath(hp.run_id), 'w') as f:
+    f.write(str(hp))
+
+
 def _checkpoints_dir(run_id):
-  return 'runs/' + run_id + '/checkpoints'
+  return os.path.join(_run_dir(run_id), 'checkpoints')
 
 
 def _logs_dir(run_id):
-  return 'runs/' + run_id + '/logs'
+  return os.path.join(_run_dir(run_id), 'logs')
 
 
 def inputs_and_labels(d, hp):
@@ -124,8 +138,6 @@ def build_model(d, hp):
   """Builds a model."""
   model = Sequential()
 
-  # TODO: Maybe generate random embeddings for training set words that don't
-  # have GloVe embeddings.
   mask_zero = hp.mode == 'seq'
   embedding = None
   if hp.embedding == 'glove':
@@ -184,8 +196,8 @@ def train_model(model, d_train, d_test, hp):
   x_train, y_train = inputs_and_labels(d_train, hp)
   x_test, y_test = inputs_and_labels(d_test, hp)
   callbacks = [
-      ModelCheckpoint(
-          _checkpoints_dir(hp.run_id) + '/{epoch:03d}-{val_loss:.4f}.hdf5'),
+      ModelCheckpoint(os.path.join(_checkpoints_dir(hp.run_id),
+                                   '{epoch:03d}-{val_loss:.4f}.hdf5')),
       TensorBoard(log_dir=_logs_dir(hp.run_id))
   ]
   history = model.fit(x_train, y_train, epochs=hp.epochs, verbose=1,
@@ -207,7 +219,7 @@ def evaluate_model(prefix, model, d, x, y, hp):
 def train_and_evaluate_model(hp):
   """Trains and evaluates a model."""
   hp.set(run_id=datetime.datetime.now().strftime('%Y%m%d-%H%M%S'))
-  # TODO: Record hyperparams.
+  _record_hyperparams(hp)
   for path in [_checkpoints_dir(hp.run_id), _logs_dir(hp.run_id)]:
     os.makedirs(path, exist_ok=True)
 

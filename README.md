@@ -2,6 +2,7 @@
 
 ## TODO
 
+- Viterbi decoding
 - Joint (or pipelined) prediction of intent and slots
 - Predict labels for n^2 spans
 - Experiment
