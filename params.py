@@ -121,9 +121,10 @@ class Params:
     return self._get_nested(name).get()
 
   def set(self, **kwargs):
-    """Sets the specified parameters."""
+    """Sets the specified parameters and returns self."""
     for name, value in six.iteritems(kwargs):
       self._get_nested(name).set(value)
+    return self
 
   def has(self, name):
     """Returns True if the specified parameter exists."""

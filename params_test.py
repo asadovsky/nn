@@ -44,6 +44,11 @@ class TestParams(unittest.TestCase):
     self.assertEqual(p.x, 2)
     self.assertEqual(p.get('x'), 2)
 
+  def test_set_return_self(self):
+    p = Params()
+    p.define('x', 0, '')
+    self.assertEqual(p.set(x=1).x, 1)
+
   def test_description(self):
     """Tests description method."""
     p = Params()
