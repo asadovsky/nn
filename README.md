@@ -20,6 +20,11 @@
 - https://arxiv.org/pdf/1805.01052.pdf
 - https://arxiv.org/pdf/1810.02245.pdf
 
+### Tutorials
+
+- https://guillaumegenthial.github.io/sequence-tagging-with-tensorflow.html
+- https://guillaumegenthial.github.io/introduction-tensorflow-estimator.html
+
 ### Other
 
 - https://github.com/yvchen/JointSLU
