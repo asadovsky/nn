@@ -75,6 +75,14 @@ class TestParams(unittest.TestCase):
     self.assertEqual(a.get('y.z'), 1)
     self.assertRaises(AttributeError, lambda: a.get('y.z.w'))
 
+  def test_serialization(self):
+    """Tests serialization methods."""
+    p = Params()
+    p.define('x', 0, 'x desc')
+    p.define('y', 1, '')
+    p.y = 2
+    self.assertEqual(p, Params.loads(p.dumps()))
+
 
 if __name__ == '__main__':
   unittest.main()

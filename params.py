@@ -1,5 +1,6 @@
 """A simplified version of tensorflow/lingvo's Params class."""
 
+import pickle
 import re
 import six
 
@@ -135,3 +136,12 @@ class Params:
   def description(self, name):
     """Returns the description of the specified parameter."""
     return self._get_nested(name).description()
+
+  def dumps(self):
+    """Serializes this object to bytes."""
+    return pickle.dumps(self)
+
+  @staticmethod
+  def loads(s):
+    """Deserializes a Params object from bytes."""
+    return pickle.loads(s)
