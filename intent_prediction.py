@@ -16,6 +16,7 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.utils import to_categorical
 
 import atis_yvchen
+from decoding_utils import iob_transition_params
 import embedding_utils
 from params import Params
 import plotting
@@ -46,6 +47,8 @@ def hparams_seq(**kwargs):
            'Whether to update embeddings during training.')
   p.define('include_test_vocab', True,
            'Whether the embedding matrix should include test set words.')
+  p.define('use_viterbi_decoding', True,
+           'Whether to use Viterbi (vs. independent) decoding of IOB tags.')
   p.define('seq_arch', 'bilstm',
            'Architecture for sequence processing. Used for both sequence'
            ' tagging and classification. Options: none, lstm, bilstm.')
@@ -123,12 +126,18 @@ def true_iob_seqs(d, hp):
   return [seq[:hp.pad_len] for seq in _get_iob_seqs(d.tag_id_seqs, d)]
 
 
-def pred_iob_seqs(y, d):
+def pred_iob_seqs(y, d, hp):
   """Returns IOB sequences for the given predictions on the given dataset."""
   # Predict the most likely tag at each sequence position.
-  # TODO: Use Viterbi algorithm when decoding IOB tag predictions.
-  # https://www.tensorflow.org/api_docs/python/tf/contrib/crf/crf_decode
-  y = np.argmax(y, axis=2)
+  if hp.use_viterbi_decoding:
+    seq_lengths = [min(len(seq), hp.pad_len) for seq in d.tag_id_seqs]
+    y, _ = tf.contrib.crf.crf_decode(
+        tf.constant(y), iob_transition_params(d.id2tag), np.array(seq_lengths))
+    with tf.Session():
+      y = y.eval()
+  else:
+    # Independent decoding.
+    y = np.argmax(y, axis=-1)
   # Remove padding.
   tag_id_seqs = [seq[:len(d.tag_id_seqs[i])] for i, seq in enumerate(y)]
   return _get_iob_seqs(tag_id_seqs, d)
@@ -169,6 +178,7 @@ def build_model(d, hp):
     model.add(Dropout(hp.dropout_rate))
 
   if hp.mode == 'seq':
+    # TODO: Add CRF layer.
     model.add(TimeDistributed(Dense(len(d.tag2id), activation='softmax')))
   elif hp.mode == 'cls':
     if hp.cls_arch == 'flatten':
@@ -211,7 +221,8 @@ def evaluate_model(prefix, model, d, x, y, hp):
   loss, acc = model.evaluate(x, y, verbose=0)
   print('{} loss={:.4f} accuracy={:.4f}'.format(prefix, loss, acc))
   if hp.mode == 'seq':
-    y_true, y_pred = true_iob_seqs(d, hp), pred_iob_seqs(model.predict(x), d)
+    y_true, y_pred = (true_iob_seqs(d, hp),
+                      pred_iob_seqs(model.predict(x), d, hp))
     print('{} seq.accuracy={:.4f} seq.f1={:.4f}'.format(
         prefix, accuracy_score(y_true, y_pred), f1_score(y_true, y_pred)))
 
@@ -247,6 +258,7 @@ def grid_search(hp=None):
       ('embedding', ['glove']),
       ('train_embedding', [True]),
       ('include_test_vocab', [True]),
+      ('use_viterbi_decoding', [True]),
       ('dropout_rate', [0.2])
   ])
   for values in itertools.product(*grid.values()):
