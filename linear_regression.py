@@ -1,5 +1,7 @@
 """Linear regression examples."""
 
+# Note, this module assumes TensorFlow 1.x, and does not support 2.x.
+
 from __future__ import print_function
 
 import numpy as np

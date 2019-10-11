@@ -9,6 +9,7 @@ import os
 import numpy as np
 from seqeval.metrics import accuracy_score, f1_score
 import tensorflow as tf
+import tensorflow_addons as tf_addons
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from tensorflow.keras.layers import Bidirectional, Dense, Dropout, Flatten, GlobalMaxPool1D, LSTM, TimeDistributed
 from tensorflow.keras.models import Sequential
@@ -22,7 +23,7 @@ from params import Params
 import plotting
 
 np.random.seed(0)
-tf.set_random_seed(0)
+tf.random.set_seed(0)
 
 TRAIN_FILENAME = 'data/atis/atis.train.w-intent.iob'
 TEST_FILENAME = 'data/atis/atis.test.w-intent.iob'
@@ -131,10 +132,9 @@ def pred_iob_seqs(y, d, hp):
   # Predict the most likely tag at each sequence position.
   if hp.use_viterbi_decoding:
     seq_lengths = [min(len(seq), hp.pad_len) for seq in d.tag_id_seqs]
-    y, _ = tf.contrib.crf.crf_decode(
+    y, _ = tf_addons.text.crf_decode(
         tf.constant(y), iob_transition_params(d.id2tag), np.array(seq_lengths))
-    with tf.Session():
-      y = y.eval()
+    y = y.numpy()
   else:
     # Independent decoding.
     y = np.argmax(y, axis=-1)

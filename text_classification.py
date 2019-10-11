@@ -14,7 +14,7 @@ from tensorflow.keras.utils import to_categorical
 import embedding_utils
 
 np.random.seed(0)
-tf.set_random_seed(0)
+tf.random.set_seed(0)
 
 # https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/
 INPUTS = ['Well done!',

@@ -4,3 +4,4 @@ numpy
 pylint
 seqeval
 tensorflow
+tensorflow_addons
