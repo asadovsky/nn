@@ -11,7 +11,7 @@ from seqeval.metrics import accuracy_score, f1_score
 import tensorflow as tf
 import tensorflow_addons as tf_addons
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
-from tensorflow.keras.layers import Bidirectional, Dense, Dropout, Flatten, GlobalMaxPool1D, LSTM, TimeDistributed
+from tensorflow.keras.layers import Bidirectional, Dense, Dropout, GlobalAvgPool1D, GlobalMaxPool1D, LSTM, TimeDistributed
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.utils import to_categorical
@@ -55,7 +55,7 @@ def hparams_seq(**kwargs):
            " tagging and classification. Options: none, lstm, bilstm.")
   p.define("cls_arch", None,
            "Architecture for classification. Used only for classification."
-           " Options: flatten, max_pool.")
+           " Options: avg_pool, max_pool.")
   p.define("hidden_dim", 50,
            "Size of hidden sequence processing layer.")
   p.define("dropout_rate", 0.2,
@@ -71,8 +71,9 @@ def hparams_seq(**kwargs):
 def hparams_cls(**kwargs):
   p = hparams_seq()
   p.mode = "cls"
-  p.seq_arch = "none"
-  p.cls_arch = "flatten"
+  p.seq_arch = "bilstm"
+  # TODO: Verify that GlobalMaxPool1D supports masking.
+  p.cls_arch = "max_pool"
   p.set(**kwargs)
   return p
 
@@ -181,8 +182,8 @@ def build_model(d, hp):
     # TODO: Add CRF layer.
     model.add(TimeDistributed(Dense(len(d.tag2id), activation="softmax")))
   elif hp.mode == "cls":
-    if hp.cls_arch == "flatten":
-      model.add(Flatten())
+    if hp.cls_arch == "avg_pool":
+      model.add(GlobalAvgPool1D())
     elif hp.cls_arch == "max_pool":
       model.add(GlobalMaxPool1D())
     else:
