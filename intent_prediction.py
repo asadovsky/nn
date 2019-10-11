@@ -72,7 +72,8 @@ def hparams_cls(**kwargs):
   p = hparams_seq()
   p.mode = "cls"
   p.seq_arch = "bilstm"
-  # TODO: Verify that GlobalMaxPool1D supports masking.
+  # TODO: GlobalMaxPool1D does not support masking, but for some reason training
+  # still succeeds.
   p.cls_arch = "max_pool"
   p.set(**kwargs)
   return p
@@ -148,15 +149,14 @@ def build_model(d, hp):
   """Builds a model."""
   model = Sequential()
 
-  mask_zero = hp.mode == "seq"
   embedding = None
   if hp.embedding == "glove":
     embedding = embedding_utils.glove_embedding(
-        d.id2word, hp.embedding_output_dim, mask_zero=mask_zero,
+        d.id2word, hp.embedding_output_dim, mask_zero=True,
         input_length=hp.pad_len, trainable=hp.train_embedding)
   elif hp.embedding == "rand":
     embedding = embedding_utils.rand_embedding(
-        d.id2word, hp.embedding_output_dim, mask_zero=mask_zero,
+        d.id2word, hp.embedding_output_dim, mask_zero=True,
         input_length=hp.pad_len, trainable=hp.train_embedding)
   else:
     assert False, hp.embedding
