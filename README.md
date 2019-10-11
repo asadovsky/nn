@@ -14,8 +14,9 @@
 
 - https://www.csie.ntu.edu.tw/~yvchen/doc/IS16_MultiJoint.pdf
 - https://arxiv.org/pdf/1611.01436.pdf
-- https://aclweb.org/anthology/P17-1044
-- https://aclweb.org/anthology/P18-2058
+- https://aclweb.org/anthology/P17-1044/
+- https://aclweb.org/anthology/N18-2050/
+- https://aclweb.org/anthology/P18-2058/
 - https://arxiv.org/pdf/1805.01052.pdf
 - https://arxiv.org/pdf/1810.02245.pdf
 
@@ -27,8 +28,7 @@
 ### Other
 
 - https://github.com/yvchen/JointSLU
-- https://github.com/luheng/deep_srl
-- http://deeplearning.net/tutorial/rnnslu.html
+- https://github.com/AtmaHou/Task-Oriented-Dialogue-Dataset-Survey
 
 ## Embeddings
 

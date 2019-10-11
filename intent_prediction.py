@@ -40,11 +40,11 @@ def hparams_seq(**kwargs):
            "Maximum sequence length.")
   p.define("padding", "post",
            "Options: pre, post.")
-  p.define("embedding", "glove",
+  p.define("emb_type", "glove",
            "Embedding type. Options: glove, rand.")
-  p.define("embedding_output_dim", 50,
+  p.define("emb_output_dim", 50,
            "Size of the embedding.")
-  p.define("train_embedding", True,
+  p.define("train_emb", True,
            "Whether to update embeddings during training.")
   p.define("include_test_vocab", True,
            "Whether the embedding matrix should include test set words.")
@@ -72,8 +72,6 @@ def hparams_cls(**kwargs):
   p = hparams_seq()
   p.mode = "cls"
   p.seq_arch = "bilstm"
-  # TODO: GlobalMaxPool1D does not support masking, but for some reason training
-  # still succeeds.
   p.cls_arch = "max_pool"
   p.set(**kwargs)
   return p
@@ -150,14 +148,14 @@ def build_model(d, hp):
   model = Sequential()
 
   embedding = None
-  if hp.embedding == "glove":
+  if hp.emb_type == "glove":
     embedding = embedding_utils.glove_embedding(
-        d.id2word, hp.embedding_output_dim, mask_zero=True,
-        input_length=hp.pad_len, trainable=hp.train_embedding)
-  elif hp.embedding == "rand":
+        d.id2word, hp.emb_output_dim, mask_zero=True, input_length=hp.pad_len,
+        trainable=hp.train_emb)
+  elif hp.emb_type == "rand":
     embedding = embedding_utils.rand_embedding(
-        d.id2word, hp.embedding_output_dim, mask_zero=True,
-        input_length=hp.pad_len, trainable=hp.train_embedding)
+        d.id2word, hp.emb_output_dim, mask_zero=True, input_length=hp.pad_len,
+        trainable=hp.train_emb)
   else:
     assert False, hp.embedding
 
@@ -188,6 +186,9 @@ def build_model(d, hp):
       model.add(GlobalMaxPool1D())
     else:
       assert False, hp.cls_arch
+    # GlobalMaxPool1D does not support masking, but for some reason training
+    # still succeeds.
+    assert model.layers[-1].supports_masking
     model.add(Dense(len(d.intent2id), activation="softmax"))
   else:
     assert False, hp.mode
@@ -256,8 +257,8 @@ def grid_search(hp=None):
   if hp is None:
     hp = hparams_seq()
   grid = OrderedDict([
-      ("embedding", ["glove"]),
-      ("train_embedding", [True]),
+      ("emb_type", ["glove"]),
+      ("train_emb", [True]),
       ("include_test_vocab", [True]),
       ("use_viterbi_decoding", [True]),
       ("dropout_rate", [0.2])
