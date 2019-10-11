@@ -1,6 +1,7 @@
 """Linear regression examples."""
 
 # Note, this module assumes TensorFlow 1.x, and does not support 2.x.
+# pylint: disable=no-member
 
 from __future__ import print_function
 

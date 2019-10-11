@@ -8,14 +8,14 @@ from tensorflow.keras.layers import Embedding
 
 def _load_glove(output_dim):
   """Loads GloVe word vectors."""
-  filepath = 'data/glove/glove.6B.{}d.txt'.format(output_dim)
+  filepath = "data/glove/glove.6B.{}d.txt".format(output_dim)
   word2vec = dict()
-  print('Loading GloVe word vectors from {}'.format(filepath))
+  print("Loading GloVe word vectors from {}".format(filepath))
   with open(filepath) as f:
     for line in f:
       parts = line.split()
-      word2vec[parts[0]] = np.asarray(parts[1:], dtype='float32')
-  print('Loaded {} word vectors'.format(len(word2vec)))
+      word2vec[parts[0]] = np.asarray(parts[1:], dtype="float32")
+  print("Loaded {} word vectors".format(len(word2vec)))
   assert output_dim == len(next(iter(word2vec.values())))
   return word2vec
 

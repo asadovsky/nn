@@ -3,8 +3,8 @@
 # Reference:
 # https://github.com/yvchen/JointSLU/blob/master/program/wordSlotDataSet.py
 
-PAD = '<pad>'
-UNK = '<unk>'
+PAD = "<pad>"
+UNK = "<unk>"
 
 
 def _proc_tokens(tokens, token2id, update_token2id):
@@ -20,7 +20,7 @@ def _proc_tokens(tokens, token2id, update_token2id):
 
 
 def _make_id2token(token2id):
-  id2token = [''] * len(token2id)
+  id2token = [""] * len(token2id)
   for token, i in iter(token2id.items()):
     id2token[i] = token
   return id2token
@@ -54,18 +54,18 @@ class Dataset:  # pylint: disable=too-few-public-methods
     """Adds examples from `filename` to vocab and/or data."""
     with open(filename) as f:
       for line in f:
-        parts = line.split('\t')
+        parts = line.split("\t")
         assert len(parts) == 2
         words = parts[0].strip().split()
         tags = parts[1].strip().split()
         assert len(words) == len(tags)
         word_id_seq = _proc_tokens(words, self.word2id, extend_vocab)
-        # Replace the intent name with 'O' in the tag seq so that the word and
+        # Replace the intent name with "O" in the tag seq so that the word and
         # tag seqs have the same length.
         # TODO: Add an option to keep the intent name as the final tag, which
-        # corresponds to the final word ('EOS'), so we can jointly predict the
+        # corresponds to the final word ("EOS"), so we can jointly predict the
         # tags and intent as done in the yvchen paper.
-        tag_id_seq = _proc_tokens(tags[:-1] + ['O'], self.tag2id, extend_vocab)
+        tag_id_seq = _proc_tokens(tags[:-1] + ["O"], self.tag2id, extend_vocab)
         intent_id = _proc_tokens([tags[-1]], self.intent2id, extend_vocab)[0]
         if extend_data:
           self.word_id_seqs.append(word_id_seq)

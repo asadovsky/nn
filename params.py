@@ -44,7 +44,7 @@ class Params:
     self._params = {}
 
   def __getattr__(self, name):
-    if name == '_params':
+    if name == "_params":
       return self.__dict__[name]
     try:
       return self._params[name].get()
@@ -52,7 +52,7 @@ class Params:
       raise AttributeError(name) from None
 
   def __setattr__(self, name, value):
-    if name == '_params':
+    if name == "_params":
       self.__dict__[name] = value
     else:
       try:
@@ -71,9 +71,9 @@ class Params:
     return not self == other
 
   def _to_string(self, depth):
-    param_strs = ['%s%s: %s' % ('  ' * (depth + 1), k, v.to_string(depth + 1))
+    param_strs = ["%s%s: %s" % ("  " * (depth + 1), k, v.to_string(depth + 1))
                   for k, v in six.iteritems(self._params)]
-    return '{\n%s\n%s}' % ('\n'.join(sorted(param_strs)), '  ' * depth)
+    return "{\n%s\n%s}" % ("\n".join(sorted(param_strs)), "  " * depth)
 
   def __str__(self):
     return self._to_string(0)
@@ -95,14 +95,14 @@ class Params:
     """
     assert (name is not None and
             isinstance(name, six.string_types) and
-            re.match('^[a-z][a-z0-9_]*$', name) is not None)
+            re.match("^[a-z][a-z0-9_]*$", name) is not None)
     if name in self._params:
-      raise AttributeError('Parameter is already defined: %s' % name)
+      raise AttributeError("Parameter is already defined: %s" % name)
     self._params[name] = _Param(default_value, description)
 
   def _get_nested(self, name):
     """Returns the specified parameter."""
-    parts = name.split('.')
+    parts = name.split(".")
     curr = self
     for i, part in enumerate(parts):
       try:
@@ -113,7 +113,7 @@ class Params:
           return param
         curr = param.get()
       except KeyError:
-        raise AttributeError('.'.join(parts[:i+1])) from None
+        raise AttributeError(".".join(parts[:i+1])) from None
     return None
 
   def get(self, name):
