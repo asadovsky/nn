@@ -147,6 +147,7 @@ def build_model(d, hp):
   """Builds a model."""
   model = Sequential()
 
+  # TODO: Add character BiLSTM as in https://arxiv.org/abs/1805.01052.
   embedding = None
   if hp.emb_type == "glove":
     embedding = embedding_utils.glove_embedding(

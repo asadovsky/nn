@@ -40,8 +40,8 @@ def rand_embedding(id2word, output_dim, mask_zero=False, input_length=None,
                    input_length=input_length, trainable=trainable)
 
 
-# TODO: Maybe generate random embeddings for training set words that don't have
-# GloVe embeddings.
+# TODO: Generate random embeddings for training set words that don't have GloVe
+# embeddings.
 def glove_embedding(id2word, output_dim, mask_zero=False, input_length=None,
                     trainable=False):
   """Returns an Embedding with GloVe word vectors."""
