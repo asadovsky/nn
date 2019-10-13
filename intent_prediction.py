@@ -9,7 +9,7 @@ import os
 import numpy as np
 from seqeval.metrics import accuracy_score, f1_score
 import tensorflow as tf
-import tensorflow_addons as tf_addons
+import tensorflow_addons as tfa
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from tensorflow.keras.layers import Bidirectional, Dense, Dropout, GlobalAvgPool1D, GlobalMaxPool1D, LSTM, TimeDistributed
 from tensorflow.keras.models import Sequential
@@ -39,6 +39,8 @@ def hparams_seq(**kwargs):
   p.define("pad_len", 32,
            "Maximum sequence length.")
   p.define("padding", "post",
+           "Options: pre, post.")
+  p.define("truncating", "post",
            "Options: pre, post.")
   p.define("emb_type", "glove",
            "Embedding type. Options: glove, rand.")
@@ -101,12 +103,14 @@ def _logs_dir(run_id):
 
 def inputs_and_labels(d, hp):
   """Returns model inputs and labels, i.e. x and y."""
-  inputs = pad_sequences(d.word_id_seqs, maxlen=hp.pad_len, padding=hp.padding,
+  inputs = pad_sequences(d.word_id_seqs, maxlen=hp.pad_len,
+                         padding=hp.padding, truncating=hp.truncating,
                          value=d.word2id[atis_yvchen.PAD])
   labels = None
   if hp.mode == "seq":
     padded_tag_id_seqs = pad_sequences(
-        d.tag_id_seqs, maxlen=hp.pad_len, padding=hp.padding,
+        d.tag_id_seqs, maxlen=hp.pad_len,
+        padding=hp.padding, truncating=hp.truncating,
         value=d.tag2id[atis_yvchen.PAD])
     # One-hot encoding.
     labels = np.array([to_categorical(tag_ids, len(d.tag2id))
@@ -132,7 +136,7 @@ def pred_iob_seqs(y, d, hp):
   # Predict the most likely tag at each sequence position.
   if hp.use_viterbi_decoding:
     seq_lengths = [min(len(seq), hp.pad_len) for seq in d.tag_id_seqs]
-    y, _ = tf_addons.text.crf_decode(
+    y, _ = tfa.text.crf_decode(
         tf.constant(y), iob_transition_params(d.id2tag), np.array(seq_lengths))
     y = y.numpy()
   else:
@@ -221,6 +225,8 @@ def train_model(model, d_train, d_test, hp):
 
 def evaluate_model(prefix, model, d, x, y, hp):
   """Evaluates a model."""
+  # TODO: Use sklearn.metrics.classification_report and
+  # seqeval.metrics.classification_report.
   loss, acc = model.evaluate(x, y, verbose=0)
   print("{} loss={:.4f} accuracy={:.4f}".format(prefix, loss, acc))
   if hp.mode == "seq":

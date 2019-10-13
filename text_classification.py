@@ -53,7 +53,8 @@ def train_and_evaluate_model(hp):
   word2id = {v: i for i, v in enumerate(id2word)}
   encoded_inputs = t.texts_to_sequences(INPUTS)
   padded_inputs = pad_sequences(encoded_inputs, maxlen=hp["pad_len"],
-                                padding="post", value=word2id[PAD])
+                                padding="post", truncating="post",
+                                value=word2id[PAD])
 
   num_classes = len(set(LABELS))
   labels = np.array(LABELS)
