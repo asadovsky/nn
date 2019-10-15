@@ -7,7 +7,8 @@ import itertools
 import os
 
 import numpy as np
-from seqeval.metrics import accuracy_score, f1_score
+from seqeval import metrics as seq_metrics
+from sklearn import metrics as cls_metrics
 import tensorflow as tf
 import tensorflow_addons as tfa
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
@@ -71,10 +72,12 @@ def _hparams_base(**kwargs):
            " Options: avg_pool, max_pool.")
   p.define("hidden_dim", 50,
            "Size of hidden sequence processing layer.")
+  # TODO: Experiment with dropout at different layers, e.g. recurrent_dropout
+  # for LSTM layers and SpatialDropout1D for embeddings.
   p.define("dropout_rate", 0.2,
            "Dropout rate. If 0, we disable dropout.")
   p.define("optimizer", "adam",
-           "The optimizer to use. Options: adam.")
+           "Model optimizer.")
   p.define("epochs", 50,
            "Number of epochs to train.")
   p.define("use_viterbi_decoding", True,
@@ -137,7 +140,6 @@ def _x_and_y(d, hp):
                            value=d.char2id[PAD])
     x = [word_x, char_x]
 
-  y = None
   if hp.mode == "seq":
     padded_tag_id_seqs = pad_sequences(
         d.tag_id_seqs, maxlen=hp.max_len_words,
@@ -196,21 +198,16 @@ def build_model(d, word2vec, hp):
   if hp.char_emb is not None:
     char_x = Input(shape=[hp.max_len_words, hp.max_len_chars])
     x = [word_x, char_x]
-    # FIXME: Verify all the TimeDistributed and return_sequences stuff.
     char_emb = TimeDistributed(Embedding(
         len(d.id2char), hp.char_emb.dim,
         mask_zero=True, input_length=hp.max_len_chars,
         trainable=hp.char_emb.trainable))(char_x)
-    # TODO: Set recurrent_dropout?
-    char_enc = TimeDistributed(LSTM(
-        hp.char_enc_dim, return_sequences=False))(char_emb)
+    char_enc = TimeDistributed(LSTM(hp.char_enc_dim))(char_emb)
     y = concatenate([word_emb, char_enc])
 
-  # TODO: Add SpatialDropout1D layer?
   if hp.seq_arch == "none":
     pass
   elif hp.seq_arch.endswith("lstm"):
-    # TODO: Set recurrent_dropout?
     layer = LSTM(hp.hidden_dim, return_sequences=True)
     if hp.seq_arch == "bilstm":
       layer = Bidirectional(layer)
@@ -241,13 +238,8 @@ def build_model(d, word2vec, hp):
   else:
     assert False, hp.mode
 
-  optimizer = None
-  if hp.optimizer != "adam":
-    assert False, hp.optimizer
-  optimizer = hp.optimizer
-
   model = Model(x, y)
-  model.compile(loss="categorical_crossentropy", optimizer=optimizer,
+  model.compile(loss="categorical_crossentropy", optimizer=hp.optimizer,
                 metrics=["acc"])
   return model
 
@@ -269,15 +261,27 @@ def train_model(model, d_train, d_test, hp):
 
 def evaluate_model(prefix, model, d, x, y, hp):
   """Evaluates a model."""
-  # TODO: Use sklearn.metrics.classification_report and
-  # seqeval.metrics.classification_report.
   loss, acc = model.evaluate(x, y, verbose=0)
-  print("{} loss={:.4f} accuracy={:.4f}".format(prefix, loss, acc))
+  print("{} model loss={:.4f} acc={:.4f}".format(prefix, loss, acc))
+
   if hp.mode == "seq":
+    m = seq_metrics
     y_true, y_pred = (_true_iob_seqs(d, hp),
                       _pred_iob_seqs(model.predict(x), d, hp))
-    print("{} seq.accuracy={:.4f} seq.f1={:.4f}".format(
-        prefix, accuracy_score(y_true, y_pred), f1_score(y_true, y_pred)))
+    report = m.classification_report(y_true, y_pred)
+  elif hp.mode == "cls":
+    m = cls_metrics
+    y_true, y_pred = d.intent_ids, np.argmax(y, axis=-1)
+    report = m.classification_report(y_true, y_pred,
+                                     labels=range(len(d.id2intent)),
+                                     target_names=d.id2intent)
+  else:
+    assert False, hp.mode
+
+  print("{} {} acc={:.4f} f1={:.4f}".format(
+      prefix, hp.mode, m.accuracy_score(y_true, y_pred),
+      m.f1_score(y_true, y_pred, average="micro")))
+  print(report)
 
 
 def train_and_evaluate_model(hp):
@@ -287,10 +291,11 @@ def train_and_evaluate_model(hp):
   for path in [_checkpoints_dir(hp.run_id), _logs_dir(hp.run_id)]:
     os.makedirs(path, exist_ok=True)
 
-  word2vec = {}
-  if hp.word_emb.pretrained == "glove":
+  if hp.word_emb.pretrained == "none":
+    word2vec = {}
+  elif hp.word_emb.pretrained == "glove":
     word2vec = embedding_utils.read_glove(hp.word_emb.dim, pruned=True)
-  elif hp.word_emb.pretrained != "none":
+  else:
     assert False, hp.word_emb.pretrained
 
   v = Vocab()

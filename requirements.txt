@@ -3,5 +3,6 @@ matplotlib
 numpy
 pylint
 seqeval
+sklearn
 tensorflow
 tensorflow_addons
