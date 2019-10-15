@@ -46,23 +46,24 @@ def prune_glove(dim, words_to_keep):
   _write_pruned_glove(dim, pruned_word2vec)
 
 
-def make_embedding_matrix(id2word, word2vec, hp):
+def make_embedding_matrix(id2word, word2vec, initializer):
   """Returns an embedding matrix for the given words.
 
   Args:
     id2word: List of words (map of id to word) to include in the matrix.
     word2vec: Map of word to embedding.
+    initializer: Name of initializer to use, e.g. "uniform".
   """
   input_dim = len(id2word)
   output_dim = len(next(iter(word2vec.values())))
-  initializer = tf.initializers.get(hp.word_emb_initializer)
+  init_fn = tf.initializers.get(initializer)
   res = np.zeros((input_dim, output_dim))
   for i, word in enumerate(id2word):
     vec = word2vec.get(word)
     if vec is None:
       # Generate random embeddings for all words missing from word2vec,
       # including UNK.
-      res[i] = initializer([output_dim]).numpy()
+      res[i] = init_fn([output_dim]).numpy()
     else:
       res[i] = vec
   return res

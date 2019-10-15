@@ -28,8 +28,22 @@ np.random.seed(0)
 tf.random.set_seed(0)
 
 
-def hparams_seq(**kwargs):
-  """Returns hyperparams for sequence processing."""
+def hparams_emb(**kwargs):
+  """Returns hyperparams for an embedding layer."""
+  p = Params()
+  p.define("pretrained", "none",
+           "Pretrained embedding type. Options: none, glove.")
+  p.define("trainable", True,
+           "Whether to update embeddings during training.")
+  p.define("dim", 50,
+           "Embedding size.")
+  p.define("initializer", "uniform",
+           "Embedding initializer.")
+  p.set(**kwargs)
+  return p
+
+def _hparams_base(**kwargs):
+  """Returns hyperparams for a model."""
   p = Params()
   p.define("run_id", None,
            "String identifier for this run.")
@@ -43,28 +57,16 @@ def hparams_seq(**kwargs):
            "Options: pre, post.")
   p.define("truncating", "post",
            "Options: pre, post.")
-  p.define("word_emb_type", "glove",
-           "Word embedding type. Options: glove, rand.")
-  p.define("word_emb_trainable", True,
-           "Whether to update word embeddings during training.")
-  p.define("word_emb_dim", 50,
-           "Word embedding size.")
-  p.define("word_emb_initializer", "uniform",
-           "Word embedding initializer.")
-  p.define("enable_char_enc", False,
-           "Whether to enable char encoding.")
-  p.define("char_emb_dim", 10,
-           "Char embedding size.")
-  p.define("char_emb_initializer", "uniform",
-           "Char embedding initializer.")
+  p.define("word_emb", hparams_emb(pretrained="glove"),
+           "Word embedding params.")
+  p.define("char_emb", hparams_emb(dim=10, trainable=False),
+           "Char embedding params, or None to disable char encoding.")
   p.define("char_enc_dim", 20,
            "Size of char encoding layer.")
-  p.define("use_viterbi_decoding", True,
-           "Whether to use Viterbi (vs. independent) decoding of IOB tags.")
   p.define("seq_arch", "bilstm",
            "Architecture for sequence processing. Used for both sequence"
            " tagging and classification. Options: none, lstm, bilstm.")
-  p.define("cls_arch", None,
+  p.define("cls_arch", "avg_pool",
            "Architecture for classification. Used only for classification."
            " Options: avg_pool, max_pool.")
   p.define("hidden_dim", 50,
@@ -75,15 +77,22 @@ def hparams_seq(**kwargs):
            "The optimizer to use. Options: adam.")
   p.define("epochs", 50,
            "Number of epochs to train.")
+  p.define("use_viterbi_decoding", True,
+           "Whether to use Viterbi (vs. independent) decoding of IOB tags.")
   p.set(**kwargs)
   return p
 
 
+def hparams_seq(**kwargs):
+  p = _hparams_base()
+  p.char_emb = None
+  p.set(**kwargs)
+  return p
+
 def hparams_cls(**kwargs):
-  p = hparams_seq()
+  p = _hparams_base()
   p.mode = "cls"
-  p.seq_arch = "bilstm"
-  p.cls_arch = "avg_pool"
+  p.char_emb = None
   p.set(**kwargs)
   return p
 
@@ -121,7 +130,7 @@ def _x_and_y(d, hp):
                          value=d.word2id[PAD])
   x = [word_x]
 
-  if hp.enable_char_enc:
+  if hp.char_emb is not None:
     # FIXME: Pad each char seq (word) for each utterance.
     char_x = pad_sequences(d.char_id_seqs, maxlen=hp.max_len_chars,
                            padding=hp.padding, truncating=hp.truncating,
@@ -175,22 +184,23 @@ def build_model(d, word2vec, hp):
   # TODO: Make it so UNK appears in the training set, e.g. by replacing rare
   # words with UNK or adding some form of dropout.
   word_x = Input(shape=[hp.max_len_words])
-  word_emb_mat = embedding_utils.make_embedding_matrix(d.id2word, word2vec, hp)
+  word_emb_mat = embedding_utils.make_embedding_matrix(
+      d.id2word, word2vec, hp.word_emb.initializer)
   word_emb = Embedding(
-      len(d.id2word), hp.word_emb_dim, weights=[word_emb_mat],
+      len(d.id2word), hp.word_emb.dim, weights=[word_emb_mat],
       mask_zero=True, input_length=hp.max_len_words,
-      trainable=hp.word_emb_trainable)(word_x)
+      trainable=hp.word_emb.trainable)(word_x)
   x = [word_x]
   y = word_emb
 
-  if hp.enable_char_enc:
+  if hp.char_emb is not None:
     char_x = Input(shape=[hp.max_len_words, hp.max_len_chars])
     x = [word_x, char_x]
-    # TODO: Make this embedding trainable?
     # FIXME: Verify all the TimeDistributed and return_sequences stuff.
     char_emb = TimeDistributed(Embedding(
-        len(d.id2char), hp.char_emb_dim, mask_zero=True,
-        input_length=hp.max_len_chars))(char_x)
+        len(d.id2char), hp.char_emb.dim,
+        mask_zero=True, input_length=hp.max_len_chars,
+        trainable=hp.char_emb.trainable))(char_x)
     # TODO: Set recurrent_dropout?
     char_enc = TimeDistributed(LSTM(
         hp.char_enc_dim, return_sequences=False))(char_emb)
@@ -278,10 +288,10 @@ def train_and_evaluate_model(hp):
     os.makedirs(path, exist_ok=True)
 
   word2vec = {}
-  if hp.word_emb_type == "glove":
-    word2vec = embedding_utils.read_glove(hp.word_emb_dim, pruned=True)
-  elif hp.word_emb_type != "rand":
-    assert False, hp.word_emb_type
+  if hp.word_emb.pretrained == "glove":
+    word2vec = embedding_utils.read_glove(hp.word_emb.dim, pruned=True)
+  elif hp.word_emb.pretrained != "none":
+    assert False, hp.word_emb.pretrained
 
   v = Vocab()
   v.add_dataset(dataset_iter(TRAIN_FILENAME))
@@ -307,11 +317,11 @@ def grid_search(hp=None):
   if hp is None:
     hp = hparams_seq()
   grid = OrderedDict([
-      ("word_emb_type", ["glove"]),
-      ("word_emb_trainable", [True]),
-      ("word_emb_initializer", ["uniform"]),
-      ("use_viterbi_decoding", [True]),
-      ("dropout_rate", [0.2])
+      ("word_emb.pretrained", ["glove"]),
+      ("word_emb.trainable", [True]),
+      ("word_emb.initializer", ["uniform"]),
+      ("dropout_rate", [0.2]),
+      ("use_viterbi_decoding", [True])
   ])
   for values in itertools.product(*grid.values()):
     params = dict(zip(grid.keys(), values))
