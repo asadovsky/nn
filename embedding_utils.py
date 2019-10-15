@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import numpy as np
+import tensorflow as tf
 
 
 def _glove_filepath(dim, pruned=False):
@@ -45,20 +46,22 @@ def prune_glove(dim, words_to_keep):
   _write_pruned_glove(dim, pruned_word2vec)
 
 
-def make_embedding_matrix(id2word, word2vec):
+def make_embedding_matrix(id2word, word2vec, hp):
   """Returns an embedding matrix for the given words.
 
   Args:
     id2word: List of words (map of id to word) to include in the matrix.
     word2vec: Map of word to embedding.
   """
-  # TODO: Generate random (non-zero) embeddings for all words missing from
-  # word2vec, including UNK.
   input_dim = len(id2word)
   output_dim = len(next(iter(word2vec.values())))
   res = np.zeros((input_dim, output_dim))
   for i, word in enumerate(id2word):
     vec = word2vec.get(word)
-    if vec is not None:
+    if vec is None:
+      # Generate random embeddings for all words missing from word2vec,
+      # including UNK.
+      res[i] = tf.initializers.get(hp.emb_initializer)([output_dim]).numpy()
+    else:
       res[i] = vec
   return res

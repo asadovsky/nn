@@ -45,6 +45,8 @@ def hparams_seq(**kwargs):
            "Embedding type. Options: glove, rand.")
   p.define("emb_output_dim", 50,
            "Size of the embedding.")
+  p.define("emb_initializer", "uniform",
+           "Embedding initializer.")
   p.define("train_emb", True,
            "Whether to update embeddings during training.")
   p.define("use_viterbi_decoding", True,
@@ -155,7 +157,7 @@ def build_model(d, word2vec, hp):
   # TODO: Add character BiLSTM as in https://arxiv.org/abs/1805.01052.
   # TODO: Make it so UNK appears in the training set, e.g. by replacing rare
   # words with UNK or adding some form of dropout.
-  emb_matrix = embedding_utils.make_embedding_matrix(d.id2word, word2vec)
+  emb_matrix = embedding_utils.make_embedding_matrix(d.id2word, word2vec, hp)
   emb = Embedding(
       len(d.id2word), hp.emb_output_dim, weights=[emb_matrix],
       mask_zero=True, input_length=hp.pad_len, trainable=hp.train_emb)
@@ -269,6 +271,7 @@ def grid_search(hp=None):
     hp = hparams_seq()
   grid = OrderedDict([
       ("emb_type", ["glove"]),
+      ("emb_initializer", ["uniform"]),
       ("train_emb", [True]),
       ("use_viterbi_decoding", [True]),
       ("dropout_rate", [0.2])
