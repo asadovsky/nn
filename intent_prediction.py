@@ -47,8 +47,6 @@ def hparams_seq(**kwargs):
            "Size of the embedding.")
   p.define("train_emb", True,
            "Whether to update embeddings during training.")
-  p.define("include_test_vocab", True,
-           "Whether the embedding matrix should include test set words.")
   p.define("use_viterbi_decoding", True,
            "Whether to use Viterbi (vs. independent) decoding of IOB tags.")
   p.define("seq_arch", "bilstm",
@@ -272,7 +270,6 @@ def grid_search(hp=None):
   grid = OrderedDict([
       ("emb_type", ["glove"]),
       ("train_emb", [True]),
-      ("include_test_vocab", [True]),
       ("use_viterbi_decoding", [True]),
       ("dropout_rate", [0.2])
   ])
