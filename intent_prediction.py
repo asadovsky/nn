@@ -61,7 +61,7 @@ def hparams_model(**kwargs):
            "Options: pre, post.")
   p.define("word_emb", hparams_emb(pretrained="glove"),
            "Word embedding params.")
-  p.define("char_emb", hparams_emb(dim=10, trainable=False),
+  p.define("char_emb", hparams_emb(dim=10),
            "Char embedding params, or None to disable char encoding.")
   p.define("char_enc_dim", 20,
            "Size of char encoding layer.")
