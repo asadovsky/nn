@@ -3,12 +3,7 @@
 import matplotlib.pyplot as plt
 
 
-def scatter(x, y):
-  plt.scatter(x, y)
-  plt.show()
-
-
-def plot_history(history):
+def plot_history(history, filepath=None):
   """Plots Keras model.fit history."""
   acc = history.history['acc']
   val_acc = history.history['val_acc']
@@ -27,4 +22,9 @@ def plot_history(history):
   plt.plot(x, val_loss, 'r', label='Validation loss')
   plt.title('Training and validation loss')
   plt.legend()
-  plt.show()
+
+  if filepath is None:
+    plt.show()
+  else:
+    plt.savefig(filepath)
+    plt.close()

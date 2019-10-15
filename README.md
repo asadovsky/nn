@@ -2,11 +2,11 @@
 
 ## TODO
 
-- Joint (or pipelined) prediction of intent and slots
+- Add character BiLSTM
+- Feed intent to slot prediction
+- Joint prediction of intent and slots
 - Predict labels for n^2 spans
-- Experiment
-  - Character vs. word vs. WordPiece embeddings
-  - FastText, ULMFiT, ELMo, BERT
+- Experiment with different embeddings: GloVe, FastText, ELMo, BERT, etc.
 
 ## Semantic parsing
 
@@ -24,6 +24,7 @@
 
 - https://guillaumegenthial.github.io/sequence-tagging-with-tensorflow.html
 - https://guillaumegenthial.github.io/introduction-tensorflow-estimator.html
+- https://www.depends-on-the-definition.com/lstm-with-char-embeddings-for-ner/
 
 ### Other
 
