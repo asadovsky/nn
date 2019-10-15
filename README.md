@@ -2,7 +2,6 @@
 
 ## TODO
 
-- Add character BiLSTM
 - Feed intent to slot prediction
 - Joint prediction of intent and slots
 - Predict labels for n^2 spans
