@@ -55,13 +55,14 @@ def make_embedding_matrix(id2word, word2vec, hp):
   """
   input_dim = len(id2word)
   output_dim = len(next(iter(word2vec.values())))
+  initializer = tf.initializers.get(hp.word_emb_initializer)
   res = np.zeros((input_dim, output_dim))
   for i, word in enumerate(id2word):
     vec = word2vec.get(word)
     if vec is None:
       # Generate random embeddings for all words missing from word2vec,
       # including UNK.
-      res[i] = tf.initializers.get(hp.emb_initializer)([output_dim]).numpy()
+      res[i] = initializer([output_dim]).numpy()
     else:
       res[i] = vec
   return res

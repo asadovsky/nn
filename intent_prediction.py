@@ -11,8 +11,8 @@ from seqeval.metrics import accuracy_score, f1_score
 import tensorflow as tf
 import tensorflow_addons as tfa
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
-from tensorflow.keras.layers import Bidirectional, Dense, Dropout, Embedding, GlobalAvgPool1D, GlobalMaxPool1D, LSTM, TimeDistributed
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Bidirectional, concatenate, Dense, Dropout, Embedding, Input, GlobalAvgPool1D, GlobalMaxPool1D, LSTM, TimeDistributed
+from tensorflow.keras.models import Model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.utils import to_categorical
 
@@ -35,20 +35,30 @@ def hparams_seq(**kwargs):
            "String identifier for this run.")
   p.define("mode", "seq",
            "Sequence tagging or classification. Options: seq, cls.")
-  p.define("pad_len", 32,
-           "Maximum sequence length.")
+  p.define("max_len_words", 32,
+           "Maximum sequence length in words.")
+  p.define("max_len_chars", 8,
+           "Maximum word length in chars. Used for char encoding.")
   p.define("padding", "post",
            "Options: pre, post.")
   p.define("truncating", "post",
            "Options: pre, post.")
-  p.define("emb_type", "glove",
-           "Embedding type. Options: glove, rand.")
-  p.define("emb_output_dim", 50,
-           "Size of the embedding.")
-  p.define("emb_initializer", "uniform",
-           "Embedding initializer.")
-  p.define("train_emb", True,
-           "Whether to update embeddings during training.")
+  p.define("word_emb_type", "glove",
+           "Word embedding type. Options: glove, rand.")
+  p.define("word_emb_trainable", True,
+           "Whether to update word embeddings during training.")
+  p.define("word_emb_dim", 50,
+           "Word embedding size.")
+  p.define("word_emb_initializer", "uniform",
+           "Word embedding initializer.")
+  p.define("enable_char_enc", False,
+           "Whether to enable char encoding.")
+  p.define("char_emb_dim", 10,
+           "Char embedding size.")
+  p.define("char_emb_initializer", "uniform",
+           "Char embedding initializer.")
+  p.define("char_enc_dim", 20,
+           "Size of char encoding layer.")
   p.define("use_viterbi_decoding", True,
            "Whether to use Viterbi (vs. independent) decoding of IOB tags.")
   p.define("seq_arch", "bilstm",
@@ -104,25 +114,35 @@ def _logs_dir(run_id):
   return os.path.join(_run_dir(run_id), "logs")
 
 
-def _inputs_and_labels(d, hp):
+def _x_and_y(d, hp):
   """Returns model inputs and labels, i.e. x and y."""
-  inputs = pad_sequences(d.word_id_seqs, maxlen=hp.pad_len,
+  word_x = pad_sequences(d.word_id_seqs, maxlen=hp.max_len_words,
                          padding=hp.padding, truncating=hp.truncating,
                          value=d.word2id[PAD])
-  labels = None
+  x = [word_x]
+
+  if hp.enable_char_enc:
+    # FIXME: Pad each char seq (word) for each utterance.
+    char_x = pad_sequences(d.char_id_seqs, maxlen=hp.max_len_chars,
+                           padding=hp.padding, truncating=hp.truncating,
+                           value=d.char2id[PAD])
+    x = [word_x, char_x]
+
+  y = None
   if hp.mode == "seq":
     padded_tag_id_seqs = pad_sequences(
-        d.tag_id_seqs, maxlen=hp.pad_len,
+        d.tag_id_seqs, maxlen=hp.max_len_words,
         padding=hp.padding, truncating=hp.truncating,
         value=d.tag2id[PAD])
     # One-hot encoding.
-    labels = np.array([to_categorical(tag_ids, len(d.tag2id))
-                       for tag_ids in padded_tag_id_seqs])
+    y = np.array([to_categorical(tag_ids, len(d.tag2id))
+                  for tag_ids in padded_tag_id_seqs])
   elif hp.mode == "cls":
-    labels = to_categorical(d.intent_ids, len(d.intent2id))
+    y = to_categorical(d.intent_ids, len(d.intent2id))
   else:
     assert False, hp.mode
-  return inputs, labels
+
+  return x, y
 
 
 def _get_iob_seqs(tag_id_seqs, d):
@@ -131,14 +151,14 @@ def _get_iob_seqs(tag_id_seqs, d):
 
 def _true_iob_seqs(d, hp):
   """Returns (possibly truncated) IOB sequences for the given dataset."""
-  return [seq[:hp.pad_len] for seq in _get_iob_seqs(d.tag_id_seqs, d)]
+  return [seq[:hp.max_len_words] for seq in _get_iob_seqs(d.tag_id_seqs, d)]
 
 
 def _pred_iob_seqs(y, d, hp):
   """Returns IOB sequences for the given predictions on the given dataset."""
   # Predict the most likely tag at each sequence position.
   if hp.use_viterbi_decoding:
-    seq_lengths = [min(len(seq), hp.pad_len) for seq in d.tag_id_seqs]
+    seq_lengths = [min(len(seq), hp.max_len_words) for seq in d.tag_id_seqs]
     y, _ = tfa.text.crf_decode(
         tf.constant(y), iob_transition_params(d.id2tag), np.array(seq_lengths))
     y = y.numpy()
@@ -152,46 +172,62 @@ def _pred_iob_seqs(y, d, hp):
 
 def build_model(d, word2vec, hp):
   """Builds a model."""
-  model = Sequential()
-
-  # TODO: Add character BiLSTM as in https://arxiv.org/abs/1805.01052.
   # TODO: Make it so UNK appears in the training set, e.g. by replacing rare
   # words with UNK or adding some form of dropout.
-  emb_matrix = embedding_utils.make_embedding_matrix(d.id2word, word2vec, hp)
-  emb = Embedding(
-      len(d.id2word), hp.emb_output_dim, weights=[emb_matrix],
-      mask_zero=True, input_length=hp.pad_len, trainable=hp.train_emb)
-  model.add(emb)
+  word_x = Input(shape=[hp.max_len_words])
+  word_emb_mat = embedding_utils.make_embedding_matrix(d.id2word, word2vec, hp)
+  word_emb = Embedding(
+      len(d.id2word), hp.word_emb_dim, weights=[word_emb_mat],
+      mask_zero=True, input_length=hp.max_len_words,
+      trainable=hp.word_emb_trainable)(word_x)
+  x = [word_x]
+  y = word_emb
 
+  if hp.enable_char_enc:
+    char_x = Input(shape=[hp.max_len_words, hp.max_len_chars])
+    x = [word_x, char_x]
+    # TODO: Make this embedding trainable?
+    # FIXME: Verify all the TimeDistributed and return_sequences stuff.
+    char_emb = TimeDistributed(Embedding(
+        len(d.id2char), hp.char_emb_dim, mask_zero=True,
+        input_length=hp.max_len_chars))(char_x)
+    # TODO: Set recurrent_dropout?
+    char_enc = TimeDistributed(LSTM(
+        hp.char_enc_dim, return_sequences=False))(char_emb)
+    y = concatenate([word_emb, char_enc])
+
+  # TODO: Add SpatialDropout1D layer?
   if hp.seq_arch == "none":
     pass
   elif hp.seq_arch.endswith("lstm"):
+    # TODO: Set recurrent_dropout?
     layer = LSTM(hp.hidden_dim, return_sequences=True)
     if hp.seq_arch == "bilstm":
       layer = Bidirectional(layer)
     else:
       assert hp.seq_arch == "lstm"
-    model.add(layer)
+    y = layer(y)
   else:
     assert False, hp.arch
 
   if hp.dropout_rate > 0:
-    model.add(Dropout(hp.dropout_rate))
+    y = Dropout(hp.dropout_rate)(y)
 
   if hp.mode == "seq":
     # TODO: Add CRF layer.
-    model.add(TimeDistributed(Dense(len(d.tag2id), activation="softmax")))
+    y = TimeDistributed(Dense(len(d.tag2id), activation="softmax"))(y)
   elif hp.mode == "cls":
+    layer = None
     if hp.cls_arch == "avg_pool":
-      model.add(GlobalAvgPool1D())
+      layer = GlobalAvgPool1D()
     elif hp.cls_arch == "max_pool":
-      model.add(GlobalMaxPool1D())
+      layer = GlobalMaxPool1D()
     else:
       assert False, hp.cls_arch
-    # GlobalMaxPool1D does not support masking, but for some reason training
-    # still succeeds.
-    assert model.layers[-1].supports_masking
-    model.add(Dense(len(d.intent2id), activation="softmax"))
+    # https://github.com/tensorflow/tensorflow/issues/33260
+    assert layer.supports_masking
+    y = layer(y)
+    y = Dense(len(d.intent2id), activation="softmax")(y)
   else:
     assert False, hp.mode
 
@@ -200,6 +236,7 @@ def build_model(d, word2vec, hp):
     assert False, hp.optimizer
   optimizer = hp.optimizer
 
+  model = Model(x, y)
   model.compile(loss="categorical_crossentropy", optimizer=optimizer,
                 metrics=["acc"])
   return model
@@ -207,8 +244,8 @@ def build_model(d, word2vec, hp):
 
 def train_model(model, d_train, d_test, hp):
   """Trains a model."""
-  x_train, y_train = _inputs_and_labels(d_train, hp)
-  x_test, y_test = _inputs_and_labels(d_test, hp)
+  x_train, y_train = _x_and_y(d_train, hp)
+  x_test, y_test = _x_and_y(d_test, hp)
   callbacks = [
       ModelCheckpoint(os.path.join(_checkpoints_dir(hp.run_id),
                                    "{epoch:03d}-{val_loss:.4f}.hdf5")),
@@ -241,10 +278,10 @@ def train_and_evaluate_model(hp):
     os.makedirs(path, exist_ok=True)
 
   word2vec = {}
-  if hp.emb_type == "glove":
-    word2vec = embedding_utils.read_glove(hp.emb_output_dim, pruned=True)
-  elif hp.emb_type != "rand":
-    assert False, hp.emb_type
+  if hp.word_emb_type == "glove":
+    word2vec = embedding_utils.read_glove(hp.word_emb_dim, pruned=True)
+  elif hp.word_emb_type != "rand":
+    assert False, hp.word_emb_type
 
   v = Vocab()
   v.add_dataset(dataset_iter(TRAIN_FILENAME))
@@ -270,9 +307,9 @@ def grid_search(hp=None):
   if hp is None:
     hp = hparams_seq()
   grid = OrderedDict([
-      ("emb_type", ["glove"]),
-      ("emb_initializer", ["uniform"]),
-      ("train_emb", [True]),
+      ("word_emb_type", ["glove"]),
+      ("word_emb_trainable", [True]),
+      ("word_emb_initializer", ["uniform"]),
       ("use_viterbi_decoding", [True]),
       ("dropout_rate", [0.2])
   ])
