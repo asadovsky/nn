@@ -43,7 +43,8 @@ def hparams_emb(**kwargs):
   p.set(**kwargs)
   return p
 
-def _hparams_base(**kwargs):
+
+def hparams_model(**kwargs):
   """Returns hyperparams for a model."""
   p = Params()
   p.define("run_id", None,
@@ -87,13 +88,14 @@ def _hparams_base(**kwargs):
 
 
 def hparams_seq(**kwargs):
-  p = _hparams_base()
+  p = hparams_model()
   p.char_emb = None
   p.set(**kwargs)
   return p
 
+
 def hparams_cls(**kwargs):
-  p = _hparams_base()
+  p = hparams_model()
   p.mode = "cls"
   p.char_emb = None
   p.set(**kwargs)
@@ -128,16 +130,22 @@ def _logs_dir(run_id):
 
 def _x_and_y(d, hp):
   """Returns model inputs and labels, i.e. x and y."""
-  word_x = pad_sequences(d.word_id_seqs, maxlen=hp.max_len_words,
-                         padding=hp.padding, truncating=hp.truncating,
-                         value=d.word2id[PAD])
+  # <int>[num_examples, max_len_words]
+  word_x = pad_sequences(
+      d.word_id_seqs, maxlen=hp.max_len_words, value=d.word2id[PAD],
+      padding=hp.padding, truncating=hp.truncating)
   x = [word_x]
 
   if hp.char_emb is not None:
-    # FIXME: Pad each char seq (word) for each utterance.
-    char_x = pad_sequences(d.char_id_seqs, maxlen=hp.max_len_chars,
-                           padding=hp.padding, truncating=hp.truncating,
-                           value=d.char2id[PAD])
+    # Pad examples so that each one has hp.max_len_words words. Note, ideally
+    # we'd use pad_sequences here but it doesn't support padding with arrays.
+    examples = [example[:hp.max_len_words] +
+                [[] for _ in range(hp.max_len_words - len(example))]
+                for example in d.char_id_seqs]
+    # <int>[num_examples, max_len_words, max_len_chars]
+    char_x = np.stack([pad_sequences(
+        words, maxlen=hp.max_len_chars, value=d.char2id[PAD],
+        padding=hp.padding, truncating=hp.truncating) for words in examples])
     x = [word_x, char_x]
 
   if hp.mode == "seq":
@@ -202,7 +210,7 @@ def build_model(d, word2vec, hp):
         len(d.id2char), hp.char_emb.dim,
         mask_zero=True, input_length=hp.max_len_chars,
         trainable=hp.char_emb.trainable))(char_x)
-    char_enc = TimeDistributed(LSTM(hp.char_enc_dim))(char_emb)
+    char_enc = TimeDistributed(Bidirectional(LSTM(hp.char_enc_dim)))(char_emb)
     y = concatenate([word_emb, char_enc])
 
   if hp.seq_arch == "none":
