@@ -1,5 +1,7 @@
 """Dataset representation."""
 
+from collections import Counter
+
 from vocab import UNK
 
 
@@ -28,6 +30,22 @@ class Dataset:
           [_proc_tokens(list(word), vocab.char2id) for word in words])
       self.tag_id_seqs.append(_proc_tokens(tags, vocab.tag2id))
       self.intent_ids.append(_proc_tokens([intent], vocab.intent2id)[0])
+
+  def drop_rare_words(self, max_freq_to_drop):
+    """Drops words whose frequency is <= `max_freq_to_drop`."""
+    if max_freq_to_drop == 0:
+      return
+    word_ids = sum(self.word_id_seqs, [])
+    to_drop = set()
+    for word_id, count in Counter(word_ids).items():
+      if count / len(word_ids) <= max_freq_to_drop:
+        to_drop.add(word_id)
+    print("Dropping {} words".format(len(to_drop)))
+    unk_word_id = self.word2id[UNK]
+    for seq in self.word_id_seqs:
+      for i, v in enumerate(seq):
+        if v in to_drop:
+          seq[i] = unk_word_id
 
   @property
   def word2id(self):

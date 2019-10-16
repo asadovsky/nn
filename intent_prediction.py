@@ -77,6 +77,8 @@ def hparams_model(**kwargs):
   # for LSTM layers and SpatialDropout1D for embeddings.
   p.define("dropout_rate", 0.2,
            "Dropout rate. If 0, we disable dropout.")
+  p.define("drop_rare_words_freq", 0,
+           "Drop training set words whose frequency is <= this value.")
   p.define("optimizer", "adam",
            "Model optimizer.")
   p.define("epochs", 50,
@@ -191,8 +193,6 @@ def _pred_iob_seqs(y, d, hp):
 
 def build_model(d, word2vec, hp):
   """Builds a model."""
-  # TODO: Make it so UNK appears in the training set, e.g. by replacing rare
-  # words with UNK or adding some form of dropout.
   word_x = Input(shape=[hp.max_len_words])
   word_emb_mat = embedding_utils.make_embedding_matrix(
       d.id2word, word2vec, hp.word_emb.initializer)
@@ -313,6 +313,9 @@ def train_and_evaluate_model(hp):
 
   d_train = Dataset(v, dataset_iter(TRAIN_FILENAME))
   d_test = Dataset(v, dataset_iter(TEST_FILENAME))
+
+  # Drop rare words so that UNK appears in the training set.
+  d_train.drop_rare_words(hp.drop_rare_words_freq)
 
   model = build_model(d_train, word2vec, hp)
   print(model.summary())
