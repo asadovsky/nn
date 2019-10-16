@@ -1,11 +1,11 @@
-# References
-
-## TODO
+# TODO
 
 - Feed intent to slot prediction
 - Joint prediction of intent and slots
 - Predict labels for n^2 spans
 - Experiment with different embeddings: GloVe, FastText, ELMo, BERT, etc.
+
+# References
 
 ## Semantic parsing
 
