@@ -308,7 +308,6 @@ def train_and_evaluate_model(hp):
 
   v = Vocab()
   v.add_dataset(dataset_iter(TRAIN_FILENAME))
-  v.add_dataset(dataset_iter(TEST_FILENAME))
   v.add_words(word2vec.keys())
 
   d_train = Dataset(v, dataset_iter(TRAIN_FILENAME))
@@ -336,7 +335,9 @@ def grid_search(hp=None):
       ("word_emb.pretrained", ["glove"]),
       ("word_emb.trainable", [True]),
       ("word_emb.initializer", ["uniform"]),
+      ("char_emb", [None, hparams_emb(dim=10)]),
       ("dropout_rate", [0.2]),
+      ("drop_rare_words_freq", [0, 0.00002]),
       ("use_viterbi_decoding", [True])
   ])
   for values in itertools.product(*grid.values()):
