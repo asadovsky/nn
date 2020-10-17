@@ -6,3 +6,5 @@ seqeval
 sklearn
 tensorflow
 tensorflow_addons
+torch
+torchvision
