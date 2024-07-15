@@ -1,0 +1,5 @@
+target-version = "py311"
+extend-include = ["*.ipynb"]
+
+[lint]
+select = ["E", "F", "I", "PLC", "PLE", "UP"]

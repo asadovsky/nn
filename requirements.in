@@ -1,0 +1,17 @@
+absl-py
+black
+black[jupyter]
+datasets
+ipykernel
+ipython
+keras
+matplotlib
+notebook
+numpy
+pyright
+ruff
+tensorflow
+tiktoken
+torch
+tqdm
+transformers
