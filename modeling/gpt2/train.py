@@ -1,3 +1,4 @@
+import datetime
 import inspect
 import math
 import os
@@ -13,6 +14,8 @@ from torch.distributed import destroy_process_group, init_process_group
 from torch.nn import functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 from transformers import GPT2LMHeadModel
+
+from modeling import device_util
 
 # -----------------------------------------------------------------------------
 
@@ -278,7 +281,7 @@ class DataLoaderLite:
         assert split in {"train", "val"}
 
         # get the shard filenames
-        data_root = "edu_fineweb10B"
+        data_root = os.path.join(os.getcwd(), "resources", "FineWeb-Edu-10B")
         shards = os.listdir(data_root)
         shards = [s for s in shards if split in s]
         shards = sorted(shards)
@@ -337,12 +340,7 @@ else:
     ddp_local_rank = 0
     ddp_world_size = 1
     master_process = True
-    # attempt to autodetect device
-    device = "cpu"
-    if torch.cuda.is_available():
-        device = "cuda"
-    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        device = "mps"
+    device = device_util.get_device()
     print(f"using device: {device}")
 
 # added after video, pytorch can be serious about it's device vs. device_type
@@ -358,6 +356,12 @@ enc = tiktoken.get_encoding("gpt2")
 total_batch_size = 524288  # 2**19, ~0.5M, in number of tokens
 B = 64  # micro batch size
 T = 1024  # sequence length
+
+if device != "cuda":
+    total_batch_size = 128
+    B = 4
+    T = 32
+
 assert (
     total_batch_size % (B * T * ddp_world_size) == 0
 ), "make sure total_batch_size is divisible by B * T * ddp_world_size"
@@ -379,7 +383,8 @@ torch.set_float32_matmul_precision("high")
 model = GPT(GPTConfig(vocab_size=50304))
 # model = GPT.from_pretrained("gpt2") # or init from OpenAI GPT-2
 model.to(device)
-model = torch.compile(model)
+if device != "mps":
+    model = torch.compile(model)
 raw_model = model
 if ddp:
     model = DDP(model, device_ids=[ddp_local_rank])
@@ -418,9 +423,11 @@ optimizer = raw_model.configure_optimizers(
 )
 
 # create the log directory we will write checkpoints to and log to
-log_dir = "log"
-os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, "log.txt")
+run_dir = os.path.join(
+    os.getcwd(), ".runs", datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+)
+os.makedirs(run_dir)
+log_file = os.path.join(run_dir, "log.txt")
 with open(log_file, "w") as f:  # open for writing to clear the file
     pass
 
@@ -433,7 +440,7 @@ for step in range(max_steps):
         model.eval()
         val_loader.reset()
         with torch.no_grad():
-            val_loss_accum = torch.zeros(1)
+            val_loss_accum = torch.zeros(1).to(device)
             val_loss_steps = 20
             for _ in range(val_loss_steps):
                 x, y = val_loader.next_batch()
@@ -450,7 +457,7 @@ for step in range(max_steps):
                 f.write(f"{step} val {val_loss_accum.item():.4f}\n")
             if step > 0 and (step % 5000 == 0 or last_step):
                 # optionally write model checkpoints
-                checkpoint_path = os.path.join(log_dir, f"model_{step:05d}.pt")
+                checkpoint_path = os.path.join(run_dir, f"model_{step:05d}.pt")
                 checkpoint = {
                     "model": raw_model.state_dict(),
                     "config": raw_model.config,
@@ -464,7 +471,7 @@ for step in range(max_steps):
     # do one step of the optimization
     model.train()
     optimizer.zero_grad()
-    loss_accum = torch.zeros(1)
+    loss_accum = torch.zeros(1).to(device)
     for micro_step in range(grad_accum_steps):
         x, y = train_loader.next_batch()
         x, y = x.to(device), y.to(device)
