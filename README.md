@@ -39,9 +39,11 @@ Add a new package (using `numpy` as an example):
 
 ### Code
 
-- https://github.com/karpathy/minGPT/blob/master/mingpt/model.py
-- https://github.com/karpathy/makemore/blob/master/makemore.py
-- https://github.com/tensorflow/models/blob/master/official/nlp/modeling/layers/transformer.py
+- https://github.com/karpathy/build-nanogpt
+- https://github.com/karpathy/nanoGPT
+- https://github.com/karpathy/llm.c
+- https://github.com/karpathy/minGPT
+- https://github.com/karpathy/makemore
 
 ### Papers
 
