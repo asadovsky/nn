@@ -4,6 +4,7 @@ https://github.com/rowanz/hellaswag
 """
 
 import json
+import os
 from collections.abc import Callable, Iterator
 
 import tiktoken
@@ -12,9 +13,9 @@ from torch.nn import functional as F
 
 _DATA_DIR = "resources/hellaswag"
 _DATA_FILENAMES = {
-    "train": f"{_DATA_DIR}/hellaswag_train.jsonl",
-    "val": f"{_DATA_DIR}/hellaswag_val.jsonl",
-    "test": f"{_DATA_DIR}/hellaswag_test.jsonl",
+    "train": os.path.join(_DATA_DIR, "hellaswag_train.jsonl"),
+    "val": os.path.join(_DATA_DIR, "hellaswag_val.jsonl"),
+    "test": os.path.join(_DATA_DIR, "hellaswag_test.jsonl"),
 }
 _ENC = tiktoken.get_encoding("gpt2")
 

@@ -1,12 +1,14 @@
 """Utilities for reading ATIS data."""
 
+import os
+
 from data.dataset_gen import DatasetGen
 
 _DATA_DIR = "resources/atis"
 _DATA_FILENAMES = {
-    "train": f"{_DATA_DIR}/atis-2.train.w-intent.iob",
-    "val": f"{_DATA_DIR}/atis-2.dev.w-intent.iob",
-    "test": f"{_DATA_DIR}/atis.test.w-intent.iob",
+    "train": os.path.join(_DATA_DIR, "atis-2.train.w-intent.iob"),
+    "val": os.path.join(_DATA_DIR, "atis-2.dev.w-intent.iob"),
+    "test": os.path.join(_DATA_DIR, "atis.test.w-intent.iob"),
 }
 
 
