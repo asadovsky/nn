@@ -48,9 +48,9 @@ class CausalSelfAttention(nn.Module):
 class MLP(nn.Module):
     def __init__(self, cfg: GPTConfig) -> None:
         super().__init__()
-        self.c_fc = nn.Linear(cfg.n_embd, 4 * cfg.n_embd)
-        self.gelu = nn.GELU(approximate="tanh")
-        self.c_proj = nn.Linear(4 * cfg.n_embd, cfg.n_embd)
+        self.c_fc: nn.Linear = nn.Linear(cfg.n_embd, 4 * cfg.n_embd)
+        self.gelu: nn.GELU = nn.GELU(approximate="tanh")
+        self.c_proj: nn.Linear = nn.Linear(4 * cfg.n_embd, cfg.n_embd)
         setattr(self.c_proj, "NANOGPT_SCALE_INIT", 1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -63,10 +63,10 @@ class MLP(nn.Module):
 class Block(nn.Module):
     def __init__(self, cfg: GPTConfig) -> None:
         super().__init__()
-        self.ln_1 = nn.LayerNorm(cfg.n_embd)
-        self.attn = CausalSelfAttention(cfg)
-        self.ln_2 = nn.LayerNorm(cfg.n_embd)
-        self.mlp = MLP(cfg)
+        self.ln_1: nn.LayerNorm = nn.LayerNorm(cfg.n_embd)
+        self.attn: CausalSelfAttention = CausalSelfAttention(cfg)
+        self.ln_2: nn.LayerNorm = nn.LayerNorm(cfg.n_embd)
+        self.mlp: MLP = MLP(cfg)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x + self.attn(self.ln_1(x))
@@ -77,8 +77,8 @@ class Block(nn.Module):
 class GPT(nn.Module):
     def __init__(self, cfg: GPTConfig) -> None:
         super().__init__()
-        self._cfg = cfg
-        self.transformer = nn.ModuleDict(
+        self._cfg: GPTConfig = cfg
+        self.transformer: nn.ModuleDict = nn.ModuleDict(
             dict(
                 wte=nn.Embedding(cfg.vocab_size, cfg.n_embd),
                 wpe=nn.Embedding(cfg.max_seq_len, cfg.n_embd),
@@ -86,7 +86,7 @@ class GPT(nn.Module):
                 ln_f=nn.LayerNorm(cfg.n_embd),
             )
         )
-        self.lm_head = nn.Linear(cfg.n_embd, cfg.vocab_size, bias=False)
+        self.lm_head: nn.Linear = nn.Linear(cfg.n_embd, cfg.vocab_size, bias=False)
         self.transformer.wte.weight = self.lm_head.weight  # share weights
         self.apply(self._init_weights)
 
