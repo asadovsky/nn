@@ -113,6 +113,7 @@ os.makedirs(run_dir)
 log_file = os.path.join(run_dir, "log.txt")
 open(log_file, "w").close()  # touch
 
+# Training loop.
 for step in range(max_steps):
     is_last_step = step == max_steps - 1
 
