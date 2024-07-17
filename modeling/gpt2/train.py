@@ -1,9 +1,16 @@
+"""Trains a model.
+
+Usage examples:
+
+    $ PYTHONPATH=. python modeling/gpt2/train.py
+    $ PYTHONPATH=. torchrun --nproc_per_node=8 modeling/gpt2/train.py
+"""
+
 import datetime
 import math
 import os
 import time
 
-import tiktoken
 import torch
 import torch.distributed as dist
 import torch.nn as nn
@@ -14,189 +21,160 @@ from modeling import device_util
 from modeling.gpt2.data_loader import DataLoader
 from modeling.gpt2.model import GPT, GPTConfig
 
-# -----------------------------------------------------------------------------
-# simple launch:
-# python train_gpt2.py
-# DDP launch for e.g. 8 GPUs:
-# torchrun --standalone --nproc_per_node=8 train_gpt2.py
-
-# run the training loop
-
-# set up DDP (distributed data parallel).
-# torchrun command sets the env variables RANK, LOCAL_RANK, and WORLD_SIZE
-ddp = os.getenv("RANK") is not None
-if ddp:
-    # use of DDP atm demands CUDA, we set the device appropriately according to rank
-    assert torch.cuda.is_available(), "for now i think we need CUDA for DDP"
-    init_process_group(backend="nccl")
-    ddp_rank = int(os.environ["RANK"])
-    ddp_local_rank = int(os.environ["LOCAL_RANK"])
-    ddp_world_size = int(os.environ["WORLD_SIZE"])
-    device = f"cuda:{ddp_local_rank}"
-    torch.cuda.set_device(device)
-    master_process = ddp_rank == 0  # this process will do logging, checkpointing etc.
-else:
-    # vanilla, non-DDP run
-    ddp_rank = 0
-    ddp_local_rank = 0
-    ddp_world_size = 1
-    master_process = True
-    device = device_util.get_device()
-    print(f"using device: {device}")
-
-# added after video, pytorch can be serious about it's device vs. device_type
-# distinction
-device_type = "cuda" if device.startswith("cuda") else "cpu"
-
-torch.manual_seed(1337)
+torch.manual_seed(0)
 if torch.cuda.is_available():
-    torch.cuda.manual_seed(1337)
-
-enc = tiktoken.get_encoding("gpt2")
-total_batch_size, B, T = (524288, 64, 1024) if device == "cuda" else (128, 4, 32)
-
-assert (
-    total_batch_size % (B * T * ddp_world_size) == 0
-), "make sure total_batch_size is divisible by B * T * ddp_world_size"
-grad_accum_steps = total_batch_size // (B * T * ddp_world_size)
-if master_process:
-    print(f"total desired batch size: {total_batch_size}")
-    print(f"=> calculated gradient accumulation steps: {grad_accum_steps}")
-
-train_loader = DataLoader(B, T, ddp_rank, ddp_world_size, "train")
-val_loader = DataLoader(B, T, ddp_rank, ddp_world_size, "val")
+    torch.cuda.manual_seed(0)
 
 torch.set_float32_matmul_precision("high")
 
-# create model
-model = GPT(GPTConfig(vocab_size=50304))
-model.to(device)
-if device != "mps":
-    model = torch.compile(model)
-raw_model = model
-if ddp:
-    model = DDP(model, device_ids=[ddp_local_rank])
-    raw_model = model.module
+device = device_util.get_device()
+device_type = "cuda" if device.startswith("cuda") else "cpu"
 
-assert isinstance(model, nn.Module)
-assert isinstance(raw_model, nn.Module)
+use_ddp = os.getenv("RANK") is not None
+if use_ddp:
+    assert device in {"cpu", "cuda"}
+    init_process_group(backend=("gloo" if device == "cpu" else "nccl"))
+    ddp_rank = int(os.environ["RANK"])
+    ddp_local_rank = int(os.environ["LOCAL_RANK"])
+    ddp_world_size = int(os.environ["WORLD_SIZE"])
+    is_master_process = ddp_rank == 0
+    device = f"{device}:{ddp_local_rank}"
+else:
+    ddp_rank = 0
+    ddp_local_rank = 0
+    ddp_world_size = 1
+    is_master_process = True
 
+if device_type == "cuda":
+    torch.cuda.set_device(device)
+
+# Batch size and sequence length based on GPT-3 Small.
+total_batch_size, micro_batch_size, seq_len = (
+    (2**19, 64, 1024) if device_type == "cuda" else (2**8, 4, 32)
+)
+assert total_batch_size % (micro_batch_size * seq_len * ddp_world_size) == 0
+grad_accum_steps = total_batch_size // (micro_batch_size * seq_len * ddp_world_size)
+
+max_steps = 19073  # 10B tokens, batch size 2**19 tokens
+
+# Learning rate schedule based on GPT-3 Small.
 max_lr = 6e-4
 min_lr = max_lr * 0.1
-warmup_steps = 715
-max_steps = (
-    19073  # 19,073 steps is ~1 epoch, if data is 10B tokens and batch size 0.5M tokens
-)
+warmup_steps = 715  # 375M tokens, batch size 2**19 tokens
+min_lr_steps = max_steps
 
 
-def get_lr(it: int):
-    # 1) linear warmup for warmup_iters steps
-    if it < warmup_steps:
-        return max_lr * (it + 1) / warmup_steps
-    # 2) if it > lr_decay_iters, return min learning rate
-    if it > max_steps:
+def _get_lr(step: int):
+    # Linear warmup.
+    if step < warmup_steps:
+        return max_lr * (step + 1) / warmup_steps
+    if step > min_lr_steps:
         return min_lr
-    # 3) in between, use cosine decay down to min learning rate
-    decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
+    # Cosine decay between `warmup_steps` and `min_lr_steps`.
+    decay_ratio = (step - warmup_steps) / (min_lr_steps - warmup_steps)
     assert 0 <= decay_ratio <= 1
-    coeff = 0.5 * (
-        1.0 + math.cos(math.pi * decay_ratio)
-    )  # coeff starts at 1 and goes to 0
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
+    assert 0 <= coeff <= 1
     return min_lr + coeff * (max_lr - min_lr)
 
 
-# optimize!
-optimizer = raw_model.get_optimizer(0.1, 6e-4, device_type)
+# Note, 50304 is slightly larger than the GPT-2 vocab size and is divisible by 128.
+cfg = GPTConfig(vocab_size=50304)
+model = GPT(cfg)
+optimizer = model.get_optimizer(0.1, max_lr, device_type)
+model.to(device)
+if device != "mps":
+    model = torch.compile(model)
+if use_ddp:
+    model = DDP(model, device_ids=[ddp_local_rank])
+assert isinstance(model, nn.Module)
 
-# create the log directory we will write checkpoints to and log to
+train_dl = DataLoader(micro_batch_size, seq_len, ddp_rank, ddp_world_size, "train")
+val_dl = DataLoader(micro_batch_size, seq_len, ddp_rank, ddp_world_size, "val")
+
 run_dir = os.path.join(
     os.getcwd(), ".runs", datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
 )
 os.makedirs(run_dir)
 log_file = os.path.join(run_dir, "log.txt")
-with open(log_file, "w") as f:  # open for writing to clear the file
-    pass
+open(log_file, "w").close()  # touch
 
 for step in range(max_steps):
-    t0 = time.time()
-    last_step = step == max_steps - 1
+    is_last_step = step == max_steps - 1
 
-    # once in a while evaluate our validation loss
-    if step % 250 == 0 or last_step:
+    # Occasionally measure validation loss and save checkpoint.
+    if step % 250 == 0 or is_last_step:
         model.eval()
-        val_loader.reset()
+        val_dl.reset()
         with torch.no_grad():
+            val_loss_accum_steps = 20
             val_loss_accum = torch.zeros(1).to(device)
-            val_loss_steps = 20
-            for _ in range(val_loss_steps):
-                x, y = val_loader.next_batch()
+            for _ in range(val_loss_accum_steps):
+                x, y = val_dl.next_batch()
                 x, y = x.to(device), y.to(device)
-                with torch.autocast(device_type=device_type, dtype=torch.bfloat16):
+                with torch.autocast(device_type, dtype=torch.bfloat16):
                     logits, loss = model(x, y)
-                loss = loss / val_loss_steps
+                loss /= val_loss_accum_steps
                 val_loss_accum += loss.detach()
-        if ddp:
+        if use_ddp:
             dist.all_reduce(val_loss_accum, op=dist.ReduceOp.AVG)
-        if master_process:
-            print(f"validation loss: {val_loss_accum.item():.4f}")
-            with open(log_file, "a") as f:
-                f.write(f"{step} val {val_loss_accum.item():.4f}\n")
-            if step > 0 and (step % 5000 == 0 or last_step):
-                # optionally write model checkpoints
-                checkpoint_path = os.path.join(run_dir, f"model_{step:05d}.pt")
-                checkpoint = {
-                    "model": raw_model.state_dict(),
-                    "config": raw_model.config,
-                    "step": step,
-                    "val_loss": val_loss_accum.item(),
-                }
-                # you might also want to add optimizer.state_dict() and
-                # rng seeds etc., if you wanted to more exactly resume training
-                torch.save(checkpoint, checkpoint_path)
 
-    # do one step of the optimization
+        if is_master_process:
+            s = f"{step=} val_loss={val_loss_accum.item():.6f}"
+            print(s)
+            with open(log_file, "a") as f:
+                f.write(f"{s}\n")
+            if step > 0 and (step % 5000 == 0 or is_last_step):
+                torch.save(
+                    {
+                        "model": model.state_dict(),
+                        "cfg": cfg,
+                        "step": step,
+                        "val_loss": val_loss_accum.item(),
+                    },
+                    os.path.join(run_dir, f"model_{step:06d}.pt"),
+                )
+
+    # Perform one optimization step.
+    t0 = time.time()
     model.train()
     optimizer.zero_grad()
-    loss_accum = torch.zeros(1).to(device)
+
+    train_loss_accum = torch.zeros(1).to(device)  # average loss over the full batch
     for micro_step in range(grad_accum_steps):
-        x, y = train_loader.next_batch()
+        x, y = train_dl.next_batch()
         x, y = x.to(device), y.to(device)
-        # added after video, this field is also used by the forward pass.
-        if ddp:
-            model.require_backward_grad_sync = (  # pyright: ignore [reportArgumentType]
+        # FIXME: Try to eliminate this hack.
+        if use_ddp:
+            model.require_backward_grad_sync = (  # pyright: ignore
                 micro_step == grad_accum_steps - 1
             )
-        with torch.autocast(device_type=device_type, dtype=torch.bfloat16):
+        with torch.autocast(device_type, dtype=torch.bfloat16):
             logits, loss = model(x, y)
-        # we have to scale the loss to account for gradient accumulation,
-        # because the gradients just add on each successive backward().
-        # addition of gradients corresponds to a SUM in the objective, but
-        # instead of a SUM we want MEAN. Scale the loss here so it comes out right
-        loss = loss / grad_accum_steps
-        loss_accum += loss.detach()
+        loss /= grad_accum_steps
+        train_loss_accum += loss.detach()
         loss.backward()
-    if ddp:
-        dist.all_reduce(loss_accum, op=dist.ReduceOp.AVG)
+    if use_ddp:
+        dist.all_reduce(train_loss_accum, op=dist.ReduceOp.AVG)
+
     norm = nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-    # determine and set the learning rate for this iteration
-    lr = get_lr(step)
+    lr = _get_lr(step)
     for param_group in optimizer.param_groups:
         param_group["lr"] = lr
     optimizer.step()
     if device_type == "cuda":
-        torch.cuda.synchronize()  # wait for the GPU to finish work
+        torch.cuda.synchronize()
+
     t1 = time.time()
-    dt = t1 - t0  # time difference in seconds
-    tokens_processed = B * T * grad_accum_steps * ddp_world_size
-    tokens_per_sec = tokens_processed / dt
-    if master_process:
+    dt = t1 - t0
+    if is_master_process:
+        s = f"{step=} train_loss={train_loss_accum.item():.6f}"
         print(
-            f"step {step:5d} | loss: {loss_accum.item():.6f} | lr {lr:.4e} | "
-            f"norm: {norm:.4f} | dt: {dt*1000:.2f}ms | "
-            f"tok/sec: {tokens_per_sec:.2f}"
+            f"{s} {lr=:.4e} {norm=:.4f} "
+            f"dt={(dt * 1000):.2f}ms tok/sec={(total_batch_size / dt):.2f}"
         )
         with open(log_file, "a") as f:
-            f.write(f"{step} train {loss_accum.item():.6f}\n")
+            f.write(f"{s}\n")
 
-if ddp:
+if use_ddp:
     destroy_process_group()
