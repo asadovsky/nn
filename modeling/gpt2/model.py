@@ -164,20 +164,3 @@ class GPT(nn.Module):
                     sd[k].copy_(sd_hf[k])
 
         return model
-
-    def get_optimizer(
-        self, weight_decay: float, lr: float, device_type: str
-    ) -> torch.optim.Optimizer:
-        params = [p for p in self.parameters() if p.requires_grad]
-        params_decay = [p for p in params if p.dim() >= 2]
-        params_no_decay = [p for p in params if p.dim() < 2]
-        return torch.optim.AdamW(
-            [
-                {"params": params_decay, "weight_decay": weight_decay},
-                {"params": params_no_decay, "weight_decay": 0.0},
-            ],
-            lr=lr,
-            betas=(0.9, 0.95),
-            eps=1e-8,
-            fused=(device_type == "cuda"),
-        )

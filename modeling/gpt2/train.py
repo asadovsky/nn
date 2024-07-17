@@ -81,13 +81,27 @@ def _get_lr(step: int):
 # Note, 50304 is slightly larger than the GPT-2 vocab size and is divisible by 128.
 cfg = GPTConfig(vocab_size=50304)
 model = GPT(cfg)
-optimizer = model.get_optimizer(0.1, max_lr, device_type)
 model.to(device)
 if device != "mps":
     model = torch.compile(model)
 if use_ddp:
     model = DDP(model, device_ids=[ddp_local_rank])
 assert isinstance(model, nn.Module)
+
+# Create optimizer.
+params = [p for p in model.parameters() if p.requires_grad]
+params_decay = [p for p in params if p.dim() >= 2]
+params_no_decay = [p for p in params if p.dim() < 2]
+optimizer = torch.optim.AdamW(
+    [
+        {"params": params_decay, "weight_decay": 0.1},
+        {"params": params_no_decay, "weight_decay": 0.0},
+    ],
+    lr=max_lr,
+    betas=(0.9, 0.95),
+    eps=1e-8,
+    fused=(device_type == "cuda"),
+)
 
 train_dl = DataLoader(micro_batch_size, seq_len, ddp_rank, ddp_world_size, "train")
 val_dl = DataLoader(micro_batch_size, seq_len, ddp_rank, ddp_world_size, "val")
