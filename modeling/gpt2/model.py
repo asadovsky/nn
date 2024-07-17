@@ -15,6 +15,15 @@ class GPTConfig:
     n_embd: int = 768  # embedding dimensionality
 
 
+def _init_weight(module: nn.Linear | nn.Embedding, n_layer: int | None = None) -> None:
+    std = 0.02
+    if n_layer is not None:
+        std *= (2 * n_layer) ** -0.5
+    torch.nn.init.normal_(module.weight, mean=0.0, std=std)
+    if isinstance(module, nn.Linear) and module.bias is not None:  # pyright: ignore
+        torch.nn.init.zeros_(module.bias)
+
+
 class CausalSelfAttention(nn.Module):
     def __init__(self, cfg: GPTConfig) -> None:
         super().__init__()
@@ -25,7 +34,8 @@ class CausalSelfAttention(nn.Module):
         self.c_attn: nn.Linear = nn.Linear(cfg.n_embd, 3 * cfg.n_embd)
         # Output projection.
         self.c_proj: nn.Linear = nn.Linear(cfg.n_embd, cfg.n_embd)
-        setattr(self.c_proj, "NANOGPT_SCALE_INIT", 1)
+        _init_weight(self.c_attn)
+        _init_weight(self.c_proj, cfg.n_layer)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Batch size, seq len, embedding dimensionality (n_embd).
@@ -51,7 +61,8 @@ class MLP(nn.Module):
         self.c_fc: nn.Linear = nn.Linear(cfg.n_embd, 4 * cfg.n_embd)
         self.gelu: nn.GELU = nn.GELU(approximate="tanh")
         self.c_proj: nn.Linear = nn.Linear(4 * cfg.n_embd, cfg.n_embd)
-        setattr(self.c_proj, "NANOGPT_SCALE_INIT", 1)
+        _init_weight(self.c_fc)
+        _init_weight(self.c_proj, cfg.n_layer)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.c_fc(x)
@@ -88,19 +99,8 @@ class GPT(nn.Module):
         )
         self.lm_head: nn.Linear = nn.Linear(cfg.n_embd, cfg.vocab_size, bias=False)
         self.transformer.wte.weight = self.lm_head.weight  # share weights
-        self.apply(self._init_weights)
-
-    def _init_weights(self, module: nn.Module) -> None:
-        if isinstance(module, nn.Linear):
-            std = 0.02
-            # FIXME: Try to eliminate this hack.
-            if hasattr(module, "NANOGPT_SCALE_INIT"):
-                std *= (2 * self._cfg.n_layer) ** -0.5
-            torch.nn.init.normal_(module.weight, mean=0.0, std=std)
-            if module.bias is not None:  # pyright: ignore [reportUnnecessaryComparison]
-                torch.nn.init.zeros_(module.bias)
-        elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        _init_weight(self.transformer.wte)
+        _init_weight(self.transformer.wpe)
 
     def forward(
         self, inputs: torch.Tensor, targets: torch.Tensor | None = None
