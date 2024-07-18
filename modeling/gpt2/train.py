@@ -3,7 +3,7 @@
 Usage examples:
 
     $ PYTHONPATH=. python modeling/gpt2/train.py
-    $ PYTHONPATH=. torchrun --nproc_per_node=8 modeling/gpt2/train.py
+    $ PYTHONPATH=. torchrun --standalone --nproc_per_node=8 modeling/gpt2/train.py
 """
 
 import datetime
@@ -27,7 +27,7 @@ if torch.cuda.is_available():
 
 torch.set_float32_matmul_precision("high")
 
-MICRO = False
+MINI = False
 
 device, device_type = device_util.get_device()
 
@@ -52,7 +52,7 @@ else:
 # Note, 50304 is slightly larger than the GPT-2 vocab size and is divisible by 128.
 cfg = (
     GPTConfig(max_seq_len=64, n_layer=2, n_head=2, n_embd=4)
-    if MICRO
+    if MINI
     else GPTConfig(vocab_size=50304)
 )
 model = GPT(cfg)
@@ -65,12 +65,12 @@ assert isinstance(model, nn.Module)
 
 # Batch size and sequence length based on GPT-3 Small.
 total_batch_size, micro_batch_size, seq_len = (
-    (2**9, 2, 32) if MICRO or device_type != "cuda" else (2**19, 64, 1024)
+    (2**9, 2, 32) if MINI or device_type != "cuda" else (2**19, 64, 1024)
 )
 assert total_batch_size % (micro_batch_size * seq_len * ddp_world_size) == 0
 grad_accum_steps = total_batch_size // (micro_batch_size * seq_len * ddp_world_size)
 
-max_steps = 50 if MICRO else 19073  # 10B tokens, batch size 2**19 tokens
+max_steps = 50 if MINI else 19073  # 10B tokens, batch size 2**19 tokens
 val_steps = 200
 ckpt_steps = 2000
 assert ckpt_steps % val_steps == 0
