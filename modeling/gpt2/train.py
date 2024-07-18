@@ -56,6 +56,9 @@ assert total_batch_size % (micro_batch_size * seq_len * ddp_world_size) == 0
 grad_accum_steps = total_batch_size // (micro_batch_size * seq_len * ddp_world_size)
 
 max_steps = 19073  # 10B tokens, batch size 2**19 tokens
+val_steps = 250
+ckpt_steps = 5000
+assert ckpt_steps % val_steps == 0
 
 # Learning rate schedule based on GPT-3 Small.
 max_lr = 6e-4
@@ -117,39 +120,6 @@ open(log_file, "w").close()  # touch
 for step in range(max_steps):
     is_last_step = step == max_steps - 1
 
-    # Occasionally measure validation loss and save checkpoint.
-    if step % 250 == 0 or is_last_step:
-        model.eval()
-        val_dl.reset()
-        with torch.no_grad():
-            val_loss_accum_steps = 20
-            val_loss_accum = torch.zeros(1).to(device)
-            for _ in range(val_loss_accum_steps):
-                x, y = val_dl.next_batch()
-                x, y = x.to(device), y.to(device)
-                with torch.autocast(device_type, dtype=torch.bfloat16):
-                    logits, loss = model(x, y)
-                loss /= val_loss_accum_steps
-                val_loss_accum += loss.detach()
-        if use_ddp:
-            dist.all_reduce(val_loss_accum, op=dist.ReduceOp.AVG)
-
-        if is_master_process:
-            s = f"{step=} val_loss={val_loss_accum.item():.6f}"
-            print(s)
-            with open(log_file, "a") as f:
-                f.write(f"{s}\n")
-            if step > 0 and (step % 5000 == 0 or is_last_step):
-                torch.save(
-                    {
-                        "model": model.state_dict(),
-                        "cfg": cfg,
-                        "step": step,
-                        "val_loss": val_loss_accum.item(),
-                    },
-                    os.path.join(run_dir, f"model_{step:06d}.pt"),
-                )
-
     # Perform one optimization step.
     t0 = time.time()
     model.train()
@@ -188,6 +158,39 @@ for step in range(max_steps):
         )
         with open(log_file, "a") as f:
             f.write(f"{s}\n")
+
+    # Occasionally measure validation loss and save checkpoint.
+    if step % val_steps == 0 or is_last_step:
+        model.eval()
+        val_dl.reset()
+        with torch.no_grad():
+            val_loss_accum_steps = 20
+            val_loss_accum = torch.zeros(1).to(device)
+            for _ in range(val_loss_accum_steps):
+                x, y = val_dl.next_batch()
+                x, y = x.to(device), y.to(device)
+                with torch.autocast(device_type, dtype=torch.bfloat16):
+                    logits, loss = model(x, y)
+                loss /= val_loss_accum_steps
+                val_loss_accum += loss.detach()
+        if use_ddp:
+            dist.all_reduce(val_loss_accum, op=dist.ReduceOp.AVG)
+
+        if is_master_process:
+            s = f"{step=} val_loss={val_loss_accum.item():.6f}"
+            print(s)
+            with open(log_file, "a") as f:
+                f.write(f"{s}\n")
+            if step > 0 and (step % ckpt_steps == 0 or is_last_step):
+                torch.save(
+                    {
+                        "model": model.state_dict(),
+                        "cfg": cfg,
+                        "step": step,
+                        "val_loss": val_loss_accum.item(),
+                    },
+                    os.path.join(run_dir, f"model_{step:06d}.pt"),
+                )
 
 if use_ddp:
     destroy_process_group()
