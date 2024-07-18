@@ -35,6 +35,14 @@ Add a new package (using `numpy` as an example):
     $ pip install -r requirements.in
     $ pip freeze > requirements.txt
 
+## Training on Lambda Cloud
+
+Launch an instance on https://lambdalabs.com/ and connect to it using SSH.
+
+Download a run:
+
+    $ scp -r -i ~/.ssh/id_ed25519 user@ip-address:~/nn/.runs/run-id .
+
 ## Resources
 
 ### Code
