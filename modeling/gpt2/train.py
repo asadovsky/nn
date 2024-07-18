@@ -40,14 +40,13 @@ if use_ddp:
     ddp_world_size = int(os.environ["WORLD_SIZE"])
     is_master_process = ddp_rank == 0
     device = f"{device}:{ddp_local_rank}"
+    if device_type == "cuda":
+        torch.cuda.set_device(device)
 else:
     ddp_rank = 0
     ddp_local_rank = 0
     ddp_world_size = 1
     is_master_process = True
-
-if device_type == "cuda":
-    torch.cuda.set_device(device)
 
 # Create model.
 # Note, 50304 is slightly larger than the GPT-2 vocab size and is divisible by 128.
@@ -66,7 +65,7 @@ assert isinstance(model, nn.Module)
 
 # Batch size and sequence length based on GPT-3 Small.
 total_batch_size, micro_batch_size, seq_len = (
-    (2**8, 4, 32) if MICRO or device_type != "cuda" else (2**19, 64, 1024)
+    (2**9, 2, 32) if MICRO or device_type != "cuda" else (2**19, 64, 1024)
 )
 assert total_batch_size % (micro_batch_size * seq_len * ddp_world_size) == 0
 grad_accum_steps = total_batch_size // (micro_batch_size * seq_len * ddp_world_size)
