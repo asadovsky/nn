@@ -24,8 +24,8 @@ Y_NP = (X_NP @ np.arange(X_NP.shape[1])).reshape(-1, 1) + np.random.normal(
 
 
 @dataclass(slots=True)
-class ModelConfig:
-    """Model configuration."""
+class Config:
+    """Configuration."""
 
     batch_size: int = N // 2
     learning_rate: float = 10.0
@@ -33,7 +33,7 @@ class ModelConfig:
     log_steps: int = 100
 
 
-def train_keras(cfg: ModelConfig) -> None:
+def train_keras(cfg: Config) -> None:
     """Trains using Keras."""
     model = Sequential()
     model.add(Input(shape=(X_NP.shape[1],)))
@@ -76,7 +76,7 @@ class RepeatingDataLoader:
             return next(self._it)
 
 
-def mk_repeating_data_loader(cfg: ModelConfig) -> RepeatingDataLoader:
+def mk_repeating_data_loader(cfg: Config) -> RepeatingDataLoader:
     return RepeatingDataLoader(
         DataLoader(
             TensorDataset(torch.Tensor(X_NP), torch.Tensor(Y_NP)),
@@ -99,7 +99,7 @@ class ModelWithLoss(nn.Module):
         return outputs, loss
 
 
-def train_torch(cfg: ModelConfig) -> None:
+def train_torch(cfg: Config) -> None:
     """Trains using PyTorch."""
     model = ModelWithLoss(nn.Linear(X_NP.shape[1], 1), nn.MSELoss())
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)

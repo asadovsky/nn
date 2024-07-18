@@ -3,7 +3,7 @@
 import unittest
 
 from modeling.linear_regression import (
-    ModelConfig,
+    Config,
     train_keras,
     train_torch,
 )
@@ -11,10 +11,10 @@ from modeling.linear_regression import (
 
 class LinearRegressionTest(unittest.TestCase):
     def test_train_keras(self) -> None:
-        train_keras(ModelConfig())
+        train_keras(Config())
 
     def test_train_torch(self) -> None:
-        train_torch(ModelConfig())
+        train_torch(Config())
 
 
 if __name__ == "__main__":
