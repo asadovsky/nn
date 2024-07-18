@@ -48,6 +48,17 @@ else:
 if device_type == "cuda":
     torch.cuda.set_device(device)
 
+# Create model.
+# Note, 50304 is slightly larger than the GPT-2 vocab size and is divisible by 128.
+cfg = GPTConfig(vocab_size=50304)
+model = GPT(cfg)
+model.to(device)
+if device != "mps":
+    model = torch.compile(model)
+if use_ddp:
+    model = DDP(model, device_ids=[ddp_local_rank])
+assert isinstance(model, nn.Module)
+
 # Batch size and sequence length based on GPT-3 Small.
 total_batch_size, micro_batch_size, seq_len = (
     (2**19, 64, 1024) if device_type == "cuda" else (2**8, 4, 32)
@@ -56,8 +67,8 @@ assert total_batch_size % (micro_batch_size * seq_len * ddp_world_size) == 0
 grad_accum_steps = total_batch_size // (micro_batch_size * seq_len * ddp_world_size)
 
 max_steps = 19073  # 10B tokens, batch size 2**19 tokens
-val_steps = 250
-ckpt_steps = 5000
+val_steps = 200
+ckpt_steps = 2000
 assert ckpt_steps % val_steps == 0
 
 # Learning rate schedule based on GPT-3 Small.
@@ -80,16 +91,6 @@ def _get_lr(step: int):
     assert 0 <= coeff <= 1
     return min_lr + coeff * (max_lr - min_lr)
 
-
-# Note, 50304 is slightly larger than the GPT-2 vocab size and is divisible by 128.
-cfg = GPTConfig(vocab_size=50304)
-model = GPT(cfg)
-model.to(device)
-if device != "mps":
-    model = torch.compile(model)
-if use_ddp:
-    model = DDP(model, device_ids=[ddp_local_rank])
-assert isinstance(model, nn.Module)
 
 # Create optimizer.
 params = [p for p in model.parameters() if p.requires_grad]

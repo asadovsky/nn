@@ -125,7 +125,7 @@ class GPT(nn.Module):
         return logits, loss
 
     @classmethod
-    def from_pretrained(cls, model_type: str) -> "GPT":
+    def from_pretrained(cls, model_name: str) -> "GPT":
         """Loads model weights from GPT2LMHeadModel."""
         # https://openai.com/index/gpt-2-1-5b-release/
         cfg_dict = {
@@ -133,14 +133,14 @@ class GPT(nn.Module):
             "gpt2-medium": dict(n_layer=24, n_head=16, n_embd=1024),  # 355M params
             "gpt2-large": dict(n_layer=36, n_head=20, n_embd=1280),  # 774M params
             "gpt2-xl": dict(n_layer=48, n_head=25, n_embd=1600),  # 1.5B params
-        }[model_type]
+        }[model_name]
         cfg_dict["vocab_size"] = 50257
         cfg_dict["max_seq_len"] = 1024
         model = GPT(GPTConfig(**cfg_dict))
         sd = model.state_dict()
         sd_keys = sd.keys()
 
-        model_hf = GPT2LMHeadModel.from_pretrained(model_type)
+        model_hf = GPT2LMHeadModel.from_pretrained(model_name)
         assert isinstance(model_hf, nn.Module)
         sd_hf = model_hf.state_dict()
         sd_keys_hf = sd_hf.keys()
