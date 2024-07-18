@@ -114,12 +114,14 @@ optimizer = torch.optim.AdamW(
 train_dl = DataLoader(micro_batch_size, seq_len, ddp_rank, ddp_world_size, "train")
 val_dl = DataLoader(micro_batch_size, seq_len, ddp_rank, ddp_world_size, "val")
 
-run_dir = os.path.join(
-    os.getcwd(), ".runs", datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
-)
-os.makedirs(run_dir)
-log_file = os.path.join(run_dir, "log.txt")
-open(log_file, "w").close()  # touch
+run_dir, log_file = "", ""
+if is_master_process:
+    run_dir = os.path.join(
+        os.getcwd(), ".runs", datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+    )
+    os.makedirs(run_dir)
+    log_file = os.path.join(run_dir, "log.txt")
+    open(log_file, "w").close()  # touch
 
 # Training loop.
 for step in range(max_steps):
