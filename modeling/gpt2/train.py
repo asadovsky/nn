@@ -27,8 +27,7 @@ if torch.cuda.is_available():
 
 torch.set_float32_matmul_precision("high")
 
-device = device_util.get_device()
-device_type = "cuda" if device.startswith("cuda") else "cpu"
+device, device_type = device_util.get_device()
 
 use_ddp = os.getenv("RANK") is not None
 if use_ddp:
@@ -185,8 +184,8 @@ for step in range(max_steps):
             if step > 0 and (step % ckpt_steps == 0 or is_last_step):
                 torch.save(
                     {
-                        "model": model.state_dict(),
-                        "cfg": cfg,
+                        "model_cfg": cfg,
+                        "model_sd": model.state_dict(),
                         "step": step,
                         "val_loss": val_loss_accum.item(),
                     },
