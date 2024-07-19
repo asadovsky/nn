@@ -25,8 +25,6 @@ Y_NP = (X_NP @ np.arange(X_NP.shape[1])).reshape(-1, 1) + np.random.normal(
 
 @dataclass(slots=True)
 class Config:
-    """Configuration."""
-
     batch_size: int = N // 2
     learning_rate: float = 10.0
     max_steps: int = 500

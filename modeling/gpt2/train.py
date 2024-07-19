@@ -11,6 +11,7 @@ import datetime
 import math
 import os
 import time
+from dataclasses import dataclass
 
 import torch
 import torch.distributed as dist
@@ -28,53 +29,56 @@ if torch.cuda.is_available():
 
 torch.set_float32_matmul_precision("high")
 
-MINI_RUN = False
 
-# Batch size based on GPT-3 Small.
-TOTAL_BATCH_SIZE, MICRO_BATCH_SIZE, SEQ_LEN = (
-    (2**9, 2, 32) if MINI_RUN or not torch.cuda.is_available() else (2**19, 64, 1024)
-)
+@dataclass(slots=True)
+class Config:
+    ckpt: str = ""
+    # If set, various params below will be overridden.
+    mini_run: bool = False
+    # Batch size based on GPT-3 Small.
+    total_batch_toks: int = 2**19
+    micro_batch_size: int = 64  # max size for NVIDIA A100 80GB
+    seq_len: int = 1024
+    max_steps: int = 19073  # 10B tokens, batch size 2**19 tokens
+    val_steps: int = 200
+    ckpt_steps: int = 2000
+    max_lr: float = 6e-4
+    warmup_steps: int = 715  # 375M tokens, batch size 2**19 tokens
 
-MAX_STEPS = 50 if MINI_RUN else 19073  # 10B tokens, batch size 2**19 tokens
-VAL_STEPS = 200
-CKPT_STEPS = 2000
-assert CKPT_STEPS % VAL_STEPS == 0
 
-MAX_LR = 6e-4
-WARMUP_STEPS = 715  # 375M tokens, batch size 2**19 tokens
-
-
-def get_lr(step: int):
+def get_lr(cfg: Config, step: int):
     # Learning rate schedule based on GPT-3 Small.
-    min_lr = MAX_LR * 0.1
-    min_lr_steps = MAX_STEPS
+    min_lr = cfg.max_lr * 0.1
+    min_lr_steps = cfg.max_steps
     # Linear warmup.
-    if step < WARMUP_STEPS:
-        return MAX_LR * (step + 1) / WARMUP_STEPS
+    if step < cfg.warmup_steps:
+        return cfg.max_lr * (step + 1) / cfg.warmup_steps
     if step > min_lr_steps:
         return min_lr
-    # Cosine decay from `WARMUP_STEPS` to `min_lr_steps`.
-    decay_ratio = (step - WARMUP_STEPS) / (min_lr_steps - WARMUP_STEPS)
+    # Cosine decay from `warmup_steps` to `min_lr_steps`.
+    decay_ratio = (step - cfg.warmup_steps) / (min_lr_steps - cfg.warmup_steps)
     assert 0 <= decay_ratio <= 1
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
     assert 0 <= coeff <= 1
-    return min_lr + coeff * (MAX_LR - min_lr)
+    return min_lr + coeff * (cfg.max_lr - min_lr)
 
 
-def get_model(state: dict | None) -> tuple[GPTConfig, GPT]:
+def get_model(cfg: Config, state: dict | None) -> tuple[GPT, GPTConfig]:
     # Note, 50304 is slightly larger than the GPT-2 vocab size and is divisible by 128.
-    cfg = (
+    model_cfg = (
         GPTConfig(max_seq_len=64, n_layer=2, n_head=2, n_embd=4)
-        if MINI_RUN
+        if cfg.mini_run
         else GPTConfig(vocab_size=50304)
     )
-    model = GPT(cfg)
+    model = GPT(model_cfg)
     if state is not None:
         model.load_state_dict(state)
-    return cfg, model
+    return model, model_cfg
 
 
-def get_optimizer(state: dict | None, model: GPT, fused: bool) -> torch.optim.Optimizer:
+def get_optimizer(
+    cfg: Config, state: dict | None, model: GPT, fused: bool
+) -> torch.optim.Optimizer:
     params = [p for p in model.parameters() if p.requires_grad]
     params_decay = [p for p in params if p.dim() >= 2]
     params_no_decay = [p for p in params if p.dim() < 2]
@@ -83,7 +87,7 @@ def get_optimizer(state: dict | None, model: GPT, fused: bool) -> torch.optim.Op
             {"params": params_decay, "weight_decay": 0.1},
             {"params": params_no_decay, "weight_decay": 0.0},
         ],
-        lr=MAX_LR,
+        lr=cfg.max_lr,
         betas=(0.9, 0.95),
         eps=1e-8,
         fused=fused,
@@ -94,19 +98,17 @@ def get_optimizer(state: dict | None, model: GPT, fused: bool) -> torch.optim.Op
 
 
 def get_data_loader(
-    state: dict | None, ddp_rank: int, ddp_world_size: int, split: str
+    cfg: Config, state: dict | None, ddp_rank: int, ddp_world_size: int, split: str
 ) -> GPTDataLoader:
-    dl = GPTDataLoader(MICRO_BATCH_SIZE, SEQ_LEN, ddp_rank, ddp_world_size, split)
+    dl = GPTDataLoader(
+        cfg.micro_batch_size, cfg.seq_len, ddp_rank, ddp_world_size, split
+    )
     if state is not None:
         dl.load_state_dict(state)
     return dl
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--ckpt", type=str)
-    args = parser.parse_args()
-
+def run(cfg: Config) -> None:
     device, device_type = device_util.get_device()
     use_ddp = os.getenv("RANK") is not None
     if use_ddp:
@@ -125,15 +127,18 @@ def main() -> None:
         ddp_world_size = 1
         is_master_process = True
 
-    ckpt = torch.load(args.ckpt) if args.ckpt else {}
-    cfg, model = get_model(ckpt.get("model_sd"))
-    optimizer = get_optimizer(ckpt.get("optimizer_sd"), model, device_type == "cuda")
-    train_dl = get_data_loader(
-        ckpt.get("train_dl_sd"), ddp_rank, ddp_world_size, "train"
-    )
+    micro_batch_toks = cfg.micro_batch_size * cfg.seq_len * ddp_world_size
+    assert cfg.total_batch_toks % micro_batch_toks == 0
+    grad_accum_steps = cfg.total_batch_toks // micro_batch_toks
 
-    assert TOTAL_BATCH_SIZE % (MICRO_BATCH_SIZE * SEQ_LEN * ddp_world_size) == 0
-    grad_accum_steps = TOTAL_BATCH_SIZE // (MICRO_BATCH_SIZE * SEQ_LEN * ddp_world_size)
+    ckpt = torch.load(cfg.ckpt) if cfg.ckpt else {}
+    model, model_cfg = get_model(cfg, ckpt.get("model_sd"))
+    optimizer = get_optimizer(
+        cfg, ckpt.get("optimizer_sd"), model, device_type == "cuda"
+    )
+    train_dl = get_data_loader(
+        cfg, ckpt.get("train_dl_sd"), ddp_rank, ddp_world_size, "train"
+    )
 
     model.to(device)
     if device != "mps":
@@ -152,8 +157,8 @@ def main() -> None:
         open(log_file, "w").close()  # touch
 
     # Training loop.
-    for step in range(ckpt["step"] + 1 if ckpt else 0, MAX_STEPS):
-        is_last_step = step == MAX_STEPS - 1
+    for step in range(ckpt["step"] + 1 if ckpt else 0, cfg.max_steps):
+        is_last_step = step == cfg.max_steps - 1
 
         # Perform one optimization step.
         t0 = time.time()
@@ -176,7 +181,7 @@ def main() -> None:
             dist.all_reduce(train_loss_accum, op=dist.ReduceOp.AVG)
 
         norm = nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        lr = get_lr(step)
+        lr = get_lr(cfg, step)
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
         optimizer.step()
@@ -189,15 +194,15 @@ def main() -> None:
             s = f"{step=} train_loss={train_loss_accum.item():.6f}"
             print(
                 f"{s} {lr=:.4e} {norm=:.4f} "
-                f"dt={(dt * 1000):.2f}ms tok/sec={(TOTAL_BATCH_SIZE / dt):.2f}"
+                f"dt={(dt * 1000):.2f}ms tok/sec={(cfg.total_batch_toks / dt):.2f}"
             )
             with open(log_file, "a") as f:
                 f.write(f"{s}\n")
 
         # Occasionally measure validation loss and save checkpoint.
-        if step % VAL_STEPS == 0 or is_last_step:
+        if step % cfg.val_steps == 0 or is_last_step:
             model.eval()
-            val_dl = get_data_loader(None, ddp_rank, ddp_world_size, "val")
+            val_dl = get_data_loader(cfg, None, ddp_rank, ddp_world_size, "val")
             with torch.no_grad():
                 val_loss_accum_steps = 20
                 val_loss_accum = torch.zeros(1).to(device)
@@ -216,10 +221,10 @@ def main() -> None:
                 print(s)
                 with open(log_file, "a") as f:
                     f.write(f"{s}\n")
-                if step > 0 and (step % CKPT_STEPS == 0 or is_last_step):
+                if step > 0 and (step % cfg.ckpt_steps == 0 or is_last_step):
                     torch.save(
                         {
-                            "model_cfg": cfg,
+                            "model_cfg": model_cfg,
                             "model_sd": model.state_dict(),
                             "optimizer_sd": optimizer.state_dict(),
                             "train_dl_sd": train_dl.state_dict(),
@@ -231,6 +236,24 @@ def main() -> None:
 
     if use_ddp:
         destroy_process_group()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--ckpt", type=str)
+    parser.add_argument("-m", "--mini-run", type=bool)
+    args = parser.parse_args()
+
+    cfg = Config(ckpt=args.ckpt, mini_run=args.mini_run)
+    if cfg.mini_run or not torch.cuda.is_available():
+        cfg.total_batch_toks = 2**9
+        cfg.micro_batch_size = 2
+        cfg.seq_len = 32
+    if cfg.mini_run:
+        cfg.max_steps = 50
+
+    assert cfg.ckpt_steps % cfg.val_steps == 0
+    run(cfg)
 
 
 if __name__ == "__main__":
