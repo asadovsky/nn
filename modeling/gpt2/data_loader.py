@@ -4,11 +4,7 @@ import numpy as np
 import torch
 
 
-def _load_toks(filename: str) -> torch.Tensor:
-    return torch.tensor(np.load(filename), dtype=torch.long)
-
-
-class DataLoader:
+class GPTDataLoader:
     def __init__(
         self,
         batch_size: int,
@@ -21,7 +17,6 @@ class DataLoader:
         self._seq_len: int = seq_len
         self._ddp_rank: int = ddp_rank
         self._ddp_world_size: int = ddp_world_size
-
         assert split in {"train", "val", "test"}
         data_dir = os.path.join(os.getcwd(), "resources", "FineWeb-Edu-10B")
         shards = os.listdir(data_dir)
@@ -29,15 +24,14 @@ class DataLoader:
         shards = [os.path.join(data_dir, x) for x in sorted(shards)]
         assert len(shards) > 0
         self._shards: list[str] = shards
-        self.reset()
-
-    def reset(self) -> None:
-        B, T = self._batch_size, self._seq_len
         self._shard_idx: int = 0
-        self._toks: torch.Tensor = _load_toks(self._shards[self._shard_idx])
-        self._tok_idx: int = B * T * self._ddp_rank
+        self._toks: torch.Tensor = self._load_toks()
+        self._tok_idx: int = self._batch_size * self._seq_len * self._ddp_rank
 
-    def next_batch(self) -> tuple[torch.Tensor, torch.Tensor]:
+    def __iter__(self) -> "GPTDataLoader":
+        return self
+
+    def __next__(self) -> tuple[torch.Tensor, torch.Tensor]:
         B, T = self._batch_size, self._seq_len
         buf = self._toks[self._tok_idx : self._tok_idx + B * T + 1]
         x = (buf[:-1]).view(B, T)  # inputs
@@ -46,6 +40,17 @@ class DataLoader:
         # Advance to next shard if needed.
         if self._tok_idx + B * T * self._ddp_world_size >= len(self._toks):
             self._shard_idx = (self._shard_idx + 1) % len(self._shards)
-            self._toks = _load_toks(self._shards[self._shard_idx])
+            self._toks = self._load_toks()
             self._tok_idx = B * T * self._ddp_rank
         return x, y
+
+    def _load_toks(self):
+        return torch.tensor(np.load(self._shards[self._shard_idx]), dtype=torch.long)
+
+    def state_dict(self) -> dict:
+        return {"shard_idx": self._shard_idx, "tok_idx": self._tok_idx}
+
+    def load_state_dict(self, state: dict) -> None:
+        self._shard_idx = state["shard_idx"]
+        self._toks = self._load_toks()
+        self._tok_idx = state["tok_idx"]

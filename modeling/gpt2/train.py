@@ -19,7 +19,7 @@ from torch.distributed import destroy_process_group, init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from modeling import device_util
-from modeling.gpt2.data_loader import DataLoader
+from modeling.gpt2.data_loader import GPTDataLoader
 from modeling.gpt2.model import GPT, GPTConfig
 
 torch.manual_seed(0)
@@ -61,7 +61,7 @@ def get_lr(step: int):
     return min_lr + coeff * (MAX_LR - min_lr)
 
 
-def get_model(ckpt: dict | None) -> tuple[GPTConfig, GPT]:
+def get_model(state: dict | None) -> tuple[GPTConfig, GPT]:
     # Note, 50304 is slightly larger than the GPT-2 vocab size and is divisible by 128.
     cfg = (
         GPTConfig(max_seq_len=64, n_layer=2, n_head=2, n_embd=4)
@@ -69,12 +69,12 @@ def get_model(ckpt: dict | None) -> tuple[GPTConfig, GPT]:
         else GPTConfig(vocab_size=50304)
     )
     model = GPT(cfg)
-    if ckpt is not None:
-        model.load_state_dict(ckpt["model_sd"])
+    if state is not None:
+        model.load_state_dict(state)
     return cfg, model
 
 
-def get_optimizer(ckpt: dict | None, model: GPT, fused: bool) -> torch.optim.Optimizer:
+def get_optimizer(state: dict | None, model: GPT, fused: bool) -> torch.optim.Optimizer:
     params = [p for p in model.parameters() if p.requires_grad]
     params_decay = [p for p in params if p.dim() >= 2]
     params_no_decay = [p for p in params if p.dim() < 2]
@@ -88,9 +88,18 @@ def get_optimizer(ckpt: dict | None, model: GPT, fused: bool) -> torch.optim.Opt
         eps=1e-8,
         fused=fused,
     )
-    if ckpt is not None:
-        optimizer.load_state_dict(ckpt["optimizer_sd"])
+    if state is not None:
+        optimizer.load_state_dict(state)
     return optimizer
+
+
+def get_data_loader(
+    state: dict | None, ddp_rank: int, ddp_world_size: int, split: str
+) -> GPTDataLoader:
+    dl = GPTDataLoader(MICRO_BATCH_SIZE, SEQ_LEN, ddp_rank, ddp_world_size, split)
+    if state is not None:
+        dl.load_state_dict(state)
+    return dl
 
 
 def main() -> None:
@@ -116,9 +125,15 @@ def main() -> None:
         ddp_world_size = 1
         is_master_process = True
 
-    ckpt = torch.load(args.ckpt) if args.ckpt else None
-    cfg, model = get_model(ckpt)
-    optimizer = get_optimizer(ckpt, model, device_type == "cuda")
+    ckpt = torch.load(args.ckpt) if args.ckpt else {}
+    cfg, model = get_model(ckpt.get("model_sd"))
+    optimizer = get_optimizer(ckpt.get("optimizer_sd"), model, device_type == "cuda")
+    train_dl = get_data_loader(
+        ckpt.get("train_dl_sd"), ddp_rank, ddp_world_size, "train"
+    )
+
+    assert TOTAL_BATCH_SIZE % (MICRO_BATCH_SIZE * SEQ_LEN * ddp_world_size) == 0
+    grad_accum_steps = TOTAL_BATCH_SIZE // (MICRO_BATCH_SIZE * SEQ_LEN * ddp_world_size)
 
     model.to(device)
     if device != "mps":
@@ -126,13 +141,6 @@ def main() -> None:
     if use_ddp:
         model = DDP(model, device_ids=[ddp_local_rank])
     assert isinstance(model, nn.Module)
-
-    assert TOTAL_BATCH_SIZE % (MICRO_BATCH_SIZE * SEQ_LEN * ddp_world_size) == 0
-    grad_accum_steps = TOTAL_BATCH_SIZE // (MICRO_BATCH_SIZE * SEQ_LEN * ddp_world_size)
-
-    # TODO: Load `train_dl` state from `ckpt`.
-    train_dl = DataLoader(MICRO_BATCH_SIZE, SEQ_LEN, ddp_rank, ddp_world_size, "train")
-    val_dl = DataLoader(MICRO_BATCH_SIZE, SEQ_LEN, ddp_rank, ddp_world_size, "val")
 
     run_dir, log_file = "", ""
     if is_master_process:
@@ -144,7 +152,7 @@ def main() -> None:
         open(log_file, "w").close()  # touch
 
     # Training loop.
-    for step in range(0 if ckpt is None else ckpt["step"] + 1, MAX_STEPS):
+    for step in range(ckpt["step"] + 1 if ckpt else 0, MAX_STEPS):
         is_last_step = step == MAX_STEPS - 1
 
         # Perform one optimization step.
@@ -154,7 +162,7 @@ def main() -> None:
 
         train_loss_accum = torch.zeros(1).to(device)  # average loss over full batch
         for micro_step in range(grad_accum_steps):
-            x, y = train_dl.next_batch()
+            x, y = next(train_dl)
             x, y = x.to(device), y.to(device)
             if use_ddp:
                 assert isinstance(model, DDP)
@@ -189,12 +197,12 @@ def main() -> None:
         # Occasionally measure validation loss and save checkpoint.
         if step % VAL_STEPS == 0 or is_last_step:
             model.eval()
-            val_dl.reset()
+            val_dl = get_data_loader(None, ddp_rank, ddp_world_size, "val")
             with torch.no_grad():
                 val_loss_accum_steps = 20
                 val_loss_accum = torch.zeros(1).to(device)
                 for _ in range(val_loss_accum_steps):
-                    x, y = val_dl.next_batch()
+                    x, y = next(val_dl)
                     x, y = x.to(device), y.to(device)
                     with torch.autocast(device_type, dtype=torch.bfloat16):
                         _, loss = model(x, y)
@@ -214,6 +222,7 @@ def main() -> None:
                             "model_cfg": cfg,
                             "model_sd": model.state_dict(),
                             "optimizer_sd": optimizer.state_dict(),
+                            "train_dl_sd": train_dl.state_dict(),
                             "step": step,
                             "val_loss": val_loss_accum.item(),
                         },

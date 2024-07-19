@@ -76,15 +76,6 @@ class RepeatingDataLoader:
             return next(self._it)
 
 
-def mk_repeating_data_loader(cfg: Config) -> RepeatingDataLoader:
-    return RepeatingDataLoader(
-        DataLoader(
-            TensorDataset(torch.Tensor(X_NP), torch.Tensor(Y_NP)),
-            batch_size=cfg.batch_size,
-        )
-    )
-
-
 class ModelWithLoss(nn.Module):
     def __init__(self, model: Callable, loss_fn: Callable) -> None:
         super().__init__()
@@ -103,15 +94,18 @@ def train_torch(cfg: Config) -> None:
     """Trains using PyTorch."""
     model = ModelWithLoss(nn.Linear(X_NP.shape[1], 1), nn.MSELoss())
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
-    step = 0
-    for x, y in mk_repeating_data_loader(cfg):
-        if step == cfg.max_steps:
-            break
-        optimizer.zero_grad(set_to_none=True)
+    dl = RepeatingDataLoader(
+        DataLoader(
+            TensorDataset(torch.Tensor(X_NP), torch.Tensor(Y_NP)),
+            batch_size=cfg.batch_size,
+        )
+    )
+    for _ in range(cfg.max_steps):
+        optimizer.zero_grad()
+        x, y = next(dl)
         _, loss = model(x, y)
         loss.backward()
         optimizer.step()
-        step += 1
     with torch.no_grad():
         _, loss = model(torch.Tensor(X_NP), torch.Tensor(Y_NP))
     w_np, b_np = (x.data.numpy() for x in model.parameters())
