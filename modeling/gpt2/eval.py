@@ -11,12 +11,12 @@ from evaluation import hellaswag
 from modeling import device_util
 from modeling.gpt2.model import GPT
 
-_USE_HF_MODEL = False
+USE_HF_MODEL = False
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--model_ckpt", type=str)
+    parser.add_argument("-c", "--ckpt", type=str)
     parser.add_argument("-m", "--model_name", type=str, default="gpt2")
     parser.add_argument("-d", "--device", type=str)
     args = parser.parse_args()
@@ -25,12 +25,12 @@ def main() -> None:
 
     device, device_type = device_util.get_device(args.device)
 
-    if _USE_HF_MODEL:
+    if USE_HF_MODEL:
         model = cast(nn.Module, GPT2LMHeadModel.from_pretrained(args.model_name))
         model_logits_fn = lambda inputs: model(inputs).logits  # noqa: E731
     else:
-        if args.model_ckpt:
-            ckpt = torch.load(args.model_ckpt)
+        if args.ckpt:
+            ckpt = torch.load(args.ckpt)
             model = GPT(ckpt["model_cfg"])
             model.load_state_dict(ckpt["model_sd"])
         else:
