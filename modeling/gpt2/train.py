@@ -34,7 +34,7 @@ torch.set_float32_matmul_precision("high")
 class Config:
     ckpt: str = ""
     # If set, various params below will be overridden.
-    mini_run: bool = False
+    test_run: bool = False
     # Batch size based on GPT-3 Small.
     total_batch_toks: int = 2**19
     micro_batch_size: int = 64  # max size for NVIDIA A100 80GB
@@ -67,7 +67,7 @@ def get_model(cfg: Config, state: dict | None) -> tuple[GPT, GPTConfig]:
     # Note, 50304 is slightly larger than the GPT-2 vocab size and is divisible by 128.
     model_cfg = (
         GPTConfig(max_seq_len=64, n_layer=2, n_head=2, n_embd=4)
-        if cfg.mini_run
+        if cfg.test_run
         else GPTConfig(vocab_size=50304)
     )
     model = GPT(model_cfg)
@@ -109,6 +109,16 @@ def get_data_loader(
 
 
 def run(cfg: Config) -> None:
+    if cfg.test_run or not torch.cuda.is_available():
+        cfg.total_batch_toks = 2**7
+        cfg.micro_batch_size = 2
+        cfg.seq_len = 8
+    if cfg.test_run:
+        cfg.max_steps = 6
+        cfg.val_steps = 2
+        cfg.ckpt_steps = 4
+    assert cfg.ckpt_steps % cfg.val_steps == 0
+
     device, device_type = device_util.get_device()
     use_ddp = os.getenv("RANK") is not None
     if use_ddp:
@@ -241,18 +251,10 @@ def run(cfg: Config) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--ckpt", type=str)
-    parser.add_argument("-m", "--mini-run", type=bool)
+    parser.add_argument("-t", "--test-run", action="store_true")
     args = parser.parse_args()
 
-    cfg = Config(ckpt=args.ckpt, mini_run=args.mini_run)
-    if cfg.mini_run or not torch.cuda.is_available():
-        cfg.total_batch_toks = 2**9
-        cfg.micro_batch_size = 2
-        cfg.seq_len = 32
-    if cfg.mini_run:
-        cfg.max_steps = 50
-
-    assert cfg.ckpt_steps % cfg.val_steps == 0
+    cfg = Config(ckpt=args.ckpt, test_run=args.test_run)
     run(cfg)
 
 

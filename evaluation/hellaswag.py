@@ -77,9 +77,13 @@ def _get_most_likely_row(
     return int(avg_loss.argmin().item())
 
 
-def run(model_logits_fn: Callable, split: str, device: str) -> tuple[int, int]:
+def run(
+    model_logits_fn: Callable, split: str, device: str, test_run: bool
+) -> tuple[int, int]:
     num_correct, num_total = 0, 0
     for example in _read_examples(split):
+        if test_run and num_total > 3:
+            break
         toks, mask, label = _render_example(example)
         toks, mask = toks.to(device), mask.to(device)
         with torch.no_grad():

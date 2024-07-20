@@ -2,11 +2,7 @@
 
 import unittest
 
-from modeling.linear_regression import (
-    Config,
-    train_keras,
-    train_torch,
-)
+from modeling.linear_regression import Config, train_keras, train_torch
 
 
 class LinearRegressionTest(unittest.TestCase):

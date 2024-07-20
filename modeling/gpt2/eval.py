@@ -19,6 +19,7 @@ torch.set_float32_matmul_precision("high")
 class Config:
     use_hf_model: bool = False
     ckpt: str = ""
+    test_run: bool = False
     model_name: str = "gpt2"
     device: str = ""
 
@@ -46,18 +47,24 @@ def run(cfg: Config) -> None:
     if device != "mps":
         model = torch.compile(model)
 
-    num_correct, num_total = hellaswag.run(model_logits_fn, "val", device)
+    num_correct, num_total = hellaswag.run(model_logits_fn, "val", device, cfg.test_run)
     print(f"{num_correct / num_total:.4f} ({num_correct}/{num_total})")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--ckpt", type=str)
-    parser.add_argument("-m", "--model_name", type=str, default="gpt2")
+    parser.add_argument("-t", "--test-run", action="store_true")
+    parser.add_argument("-m", "--model-name", type=str, default="gpt2")
     parser.add_argument("-d", "--device", type=str)
     args = parser.parse_args()
 
-    cfg = Config(ckpt=args.ckpt, model_name=args.model_name, device=args.device)
+    cfg = Config(
+        ckpt=args.ckpt,
+        test_run=args.test_run,
+        model_name=args.model_name,
+        device=args.device,
+    )
     run(cfg)
 
 
