@@ -17,10 +17,10 @@ torch.set_float32_matmul_precision("high")
 
 @dataclass(slots=True)
 class Config:
-    use_hf_model: bool = False
     ckpt: str = ""
     test_run: bool = False
     model_name: str = "gpt2"
+    use_hf_model: bool = False
     device: str = ""
 
 

@@ -35,6 +35,7 @@ class Config:
     ckpt: str = ""
     # If set, various params below will be overridden.
     test_run: bool = False
+    run_dir: str = ""
     # Batch size based on GPT-3 Small.
     total_batch_toks: int = 2**19
     micro_batch_size: int = 64  # max size for NVIDIA A100 80GB
@@ -77,7 +78,7 @@ def get_model(cfg: Config, state: dict | None) -> tuple[GPT, GPTConfig]:
 
 
 def get_optimizer(
-    cfg: Config, state: dict | None, model: GPT, fused: bool
+    cfg: Config, state: dict | None, model: nn.Module, fused: bool
 ) -> torch.optim.Optimizer:
     params = [p for p in model.parameters() if p.requires_grad]
     params_decay = [p for p in params if p.dim() >= 2]
@@ -114,7 +115,7 @@ def run(cfg: Config) -> None:
         cfg.micro_batch_size = 2
         cfg.seq_len = 8
     if cfg.test_run:
-        cfg.max_steps = 6
+        cfg.max_steps = 10
         cfg.val_steps = 2
         cfg.ckpt_steps = 4
     assert cfg.ckpt_steps % cfg.val_steps == 0
@@ -143,6 +144,12 @@ def run(cfg: Config) -> None:
 
     ckpt = torch.load(cfg.ckpt) if cfg.ckpt else {}
     model, model_cfg = get_model(cfg, ckpt.get("model_sd"))
+    model.to(device)
+    if device != "mps":
+        model = torch.compile(model)
+    if use_ddp:
+        model = DDP(model, device_ids=[ddp_local_rank])
+    assert isinstance(model, nn.Module)
     optimizer = get_optimizer(
         cfg, ckpt.get("optimizer_sd"), model, device_type == "cuda"
     )
@@ -150,19 +157,16 @@ def run(cfg: Config) -> None:
         cfg, ckpt.get("train_dl_sd"), ddp_rank, ddp_world_size, "train"
     )
 
-    model.to(device)
-    if device != "mps":
-        model = torch.compile(model)
-    if use_ddp:
-        model = DDP(model, device_ids=[ddp_local_rank])
-    assert isinstance(model, nn.Module)
-
     run_dir, log_file = "", ""
     if is_master_process:
-        run_dir = os.path.join(
-            os.getcwd(), ".runs", datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
-        )
-        os.makedirs(run_dir)
+        if cfg.run_dir:
+            assert not any(os.scandir(cfg.run_dir))
+            run_dir = cfg.run_dir
+        else:
+            run_dir = os.path.join(
+                os.getcwd(), ".runs", datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+            )
+            os.makedirs(run_dir)
         log_file = os.path.join(run_dir, "log.txt")
         open(log_file, "w").close()  # touch
 
