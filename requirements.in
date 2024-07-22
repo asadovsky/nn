@@ -2,12 +2,15 @@ absl-py
 black
 black[jupyter]
 datasets
+flax
 ipykernel
 ipython
+jax
 keras
 matplotlib
 notebook
 numpy
+optax
 pyright
 ruff
 tensorflow
