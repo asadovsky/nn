@@ -2,7 +2,7 @@
 
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 import jax
 import keras
@@ -22,10 +22,8 @@ keras.utils.set_random_seed(0)
 torch.manual_seed(0)
 
 N = 1000
-X_NP = np.random.uniform(low=0, high=100, size=(N, 4)).astype(np.float32)
-Y_NP = (X_NP @ np.arange(X_NP.shape[1])).reshape(-1, 1) + np.random.normal(
-    size=(N, 1)
-).astype(np.float32)
+X = np.random.uniform(low=0, high=100, size=(N, 4))
+Y = (X @ np.arange(X.shape[1])).reshape(-1, 1) + np.random.normal(size=(N, 1))
 
 
 @dataclass(slots=True)
@@ -42,20 +40,20 @@ def print_results(loss: float, w: np.ndarray, b: np.ndarray) -> None:
 def train_keras(cfg: Config) -> None:
     """Trains using Keras."""
     model = Sequential()
-    model.add(Input(shape=(X_NP.shape[1],)))
+    model.add(Input(shape=(X.shape[1],)))
     model.add(Dense(1))
     model.compile(
         loss="mean_squared_error",
         optimizer=keras.optimizers.Adam(learning_rate=cfg.learning_rate),
     )
     model.fit(
-        X_NP,
-        Y_NP,
+        X,
+        Y,
         batch_size=cfg.batch_size,
         epochs=cfg.max_steps * cfg.batch_size // N,
         verbose=0,
     )
-    loss = model.evaluate(X_NP, Y_NP, verbose=0)
+    loss = model.evaluate(X, Y, verbose=0)
     w, b = model.layers[0].get_weights()
     print_results(loss, w, b)
 
@@ -94,11 +92,11 @@ class ModelWithLoss(nn.Module):
 
 def train_torch(cfg: Config) -> None:
     """Trains using PyTorch."""
-    model = ModelWithLoss(nn.Linear(X_NP.shape[1], 1), nn.MSELoss())
+    model = ModelWithLoss(nn.Linear(X.shape[1], 1), nn.MSELoss())
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
     dl = RepeatingDataLoader(
         DataLoader(
-            TensorDataset(torch.Tensor(X_NP), torch.Tensor(Y_NP)),
+            TensorDataset(torch.Tensor(X), torch.Tensor(Y)),
             batch_size=cfg.batch_size,
         )
     )
@@ -111,7 +109,7 @@ def train_torch(cfg: Config) -> None:
         optimizer.step()
     model.eval()
     with torch.no_grad():
-        _, loss = model(torch.Tensor(X_NP), torch.Tensor(Y_NP))
+        _, loss = model(torch.Tensor(X), torch.Tensor(Y))
     w, b = (x.data.numpy() for x in model.parameters())
     print_results(loss, w, b)
 
@@ -120,14 +118,14 @@ def train_jax(cfg: Config) -> None:
     """Trains using JAX."""
     dl = RepeatingDataLoader(
         DataLoader(
-            TensorDataset(torch.Tensor(X_NP), torch.Tensor(Y_NP)),
+            TensorDataset(torch.Tensor(X), torch.Tensor(Y)),
             batch_size=cfg.batch_size,
         )
     )
 
     def mk_train_state() -> TrainState:
         model = fnn.Dense(1)
-        params = model.init(jax.random.key(0), jnp.ones((X_NP.shape[1],)))
+        params = model.init(jax.random.key(0), jnp.ones((X.shape[1],)))
         tx = optax.adam(learning_rate=cfg.learning_rate)
         return TrainState.create(apply_fn=model.apply, params=params, tx=tx)
 
@@ -148,7 +146,6 @@ def train_jax(cfg: Config) -> None:
     for _ in range(cfg.max_steps):
         x, y = next(dl)
         state = train_step(state, x.data.numpy(), y.data.numpy())
-    loss, _ = loss_and_grad_fn(state.params, X_NP, Y_NP)
-    params = cast(dict, state.params)
-    w, b = params["params"]["kernel"], params["params"]["bias"]
-    print_results(loss, w, b)
+    loss, _ = loss_and_grad_fn(state.params, X, Y)
+    w, b = state.params["params"]["kernel"], state.params["params"]["bias"]
+    print_results(loss, w, b)  # pyright: ignore
