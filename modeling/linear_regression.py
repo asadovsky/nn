@@ -2,11 +2,15 @@
 
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
+import jax
 import keras
 import numpy as np
+import optax
 import torch
+from flax import linen as fnn
+from jax import numpy as jnp
 from keras.layers import Dense, Input
 from keras.models import Sequential
 from torch import nn
@@ -28,7 +32,10 @@ class Config:
     batch_size: int = N // 2
     learning_rate: float = 10.0
     max_steps: int = 500
-    log_steps: int = 100
+
+
+def print_results(loss: float, w: np.ndarray, b: np.ndarray) -> None:
+    print(f"{loss=:.6f} w={np.array_str(w.reshape(-1), precision=3)} b={b.item():.3f}")
 
 
 def train_keras(cfg: Config) -> None:
@@ -49,11 +56,8 @@ def train_keras(cfg: Config) -> None:
         verbose=0,
     )
     loss = model.evaluate(X_NP, Y_NP, verbose=0)
-    w_np, b_np = dense_layer.get_weights()
-    print(
-        f"{loss=:.6f} "
-        f"w={np.array_str(w_np.reshape(-1), precision=3)} b={b_np.item():.3f}"
-    )
+    w, b = dense_layer.get_weights()
+    print_results(loss, w, b)
 
 
 class RepeatingDataLoader:
@@ -106,8 +110,45 @@ def train_torch(cfg: Config) -> None:
         optimizer.step()
     with torch.no_grad():
         _, loss = model(torch.Tensor(X_NP), torch.Tensor(Y_NP))
-    w_np, b_np = (x.data.numpy() for x in model.parameters())
-    print(
-        f"{loss=:.6f} "
-        f"w={np.array_str(w_np.reshape(-1), precision=3)} b={b_np.item():.3f}"
+    w, b = (x.data.numpy() for x in model.parameters())
+    print_results(loss, w, b)
+
+
+def train_jax(cfg: Config) -> None:
+    """Trains using JAX."""
+    model = fnn.Dense(1)
+    params = model.init(jax.random.key(0), jnp.empty((1, X_NP.shape[1])))
+    tx = optax.adam(learning_rate=cfg.learning_rate)
+    opt_state = tx.init(params)
+    dl = RepeatingDataLoader(
+        DataLoader(
+            TensorDataset(torch.Tensor(X_NP), torch.Tensor(Y_NP)),
+            batch_size=cfg.batch_size,
+        )
     )
+
+    @jax.jit
+    def mse(params: dict, inputs: jax.Array, targets: jax.Array) -> jax.Array:
+        outputs = model.apply(params, inputs)
+        return jnp.mean((outputs - targets) ** 2)
+
+    loss_and_grad = jax.jit(jax.value_and_grad(mse))
+
+    @jax.jit
+    def train_step(
+        params: dict, opt_state: optax.OptState, x: np.ndarray, y: np.ndarray
+    ) -> tuple[dict, optax.OptState]:
+        _, grad = loss_and_grad(params, x, y)
+        updates, opt_state = tx.update(grad, opt_state)
+        params = cast(dict, optax.apply_updates(params, updates))
+        return params, opt_state
+
+    for _ in range(cfg.max_steps):
+        x, y = next(dl)
+        params, opt_state = train_step(
+            params, opt_state, x.data.numpy(), y.data.numpy()
+        )
+    loss, _ = loss_and_grad(params, X_NP, Y_NP)
+    params = cast(dict, params)
+    w, b = params["params"]["kernel"], params["params"]["bias"]
+    print_results(loss, w, b)
