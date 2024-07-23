@@ -10,6 +10,7 @@ import numpy as np
 import optax
 import torch
 from flax import linen as fnn
+from flax.training.train_state import TrainState
 from jax import numpy as jnp
 from keras.layers import Dense, Input
 from keras.models import Sequential
@@ -42,8 +43,7 @@ def train_keras(cfg: Config) -> None:
     """Trains using Keras."""
     model = Sequential()
     model.add(Input(shape=(X_NP.shape[1],)))
-    dense_layer = Dense(1)
-    model.add(dense_layer)
+    model.add(Dense(1))
     model.compile(
         loss="mean_squared_error",
         optimizer=keras.optimizers.Adam(learning_rate=cfg.learning_rate),
@@ -56,7 +56,7 @@ def train_keras(cfg: Config) -> None:
         verbose=0,
     )
     loss = model.evaluate(X_NP, Y_NP, verbose=0)
-    w, b = dense_layer.get_weights()
+    w, b = model.layers[0].get_weights()
     print_results(loss, w, b)
 
 
@@ -102,12 +102,14 @@ def train_torch(cfg: Config) -> None:
             batch_size=cfg.batch_size,
         )
     )
+    model.train()
     for _ in range(cfg.max_steps):
         optimizer.zero_grad()
         x, y = next(dl)
         _, loss = model(x, y)
         loss.backward()
         optimizer.step()
+    model.eval()
     with torch.no_grad():
         _, loss = model(torch.Tensor(X_NP), torch.Tensor(Y_NP))
     w, b = (x.data.numpy() for x in model.parameters())
@@ -116,10 +118,6 @@ def train_torch(cfg: Config) -> None:
 
 def train_jax(cfg: Config) -> None:
     """Trains using JAX."""
-    model = fnn.Dense(1)
-    params = model.init(jax.random.key(0), jnp.empty((1, X_NP.shape[1])))
-    tx = optax.adam(learning_rate=cfg.learning_rate)
-    opt_state = tx.init(params)
     dl = RepeatingDataLoader(
         DataLoader(
             TensorDataset(torch.Tensor(X_NP), torch.Tensor(Y_NP)),
@@ -127,28 +125,30 @@ def train_jax(cfg: Config) -> None:
         )
     )
 
+    def mk_train_state() -> TrainState:
+        model = fnn.Dense(1)
+        params = model.init(jax.random.key(0), jnp.ones((X_NP.shape[1],)))
+        tx = optax.adam(learning_rate=cfg.learning_rate)
+        return TrainState.create(apply_fn=model.apply, params=params, tx=tx)
+
+    state = mk_train_state()
+
     @jax.jit
     def mse(params: dict, inputs: jax.Array, targets: jax.Array) -> jax.Array:
-        outputs = model.apply(params, inputs)
+        outputs = state.apply_fn(params, inputs)
         return jnp.mean((outputs - targets) ** 2)
 
-    loss_and_grad = jax.jit(jax.value_and_grad(mse))
+    loss_and_grad_fn = jax.jit(jax.value_and_grad(mse))
 
     @jax.jit
-    def train_step(
-        params: dict, opt_state: optax.OptState, x: np.ndarray, y: np.ndarray
-    ) -> tuple[dict, optax.OptState]:
-        _, grad = loss_and_grad(params, x, y)
-        updates, opt_state = tx.update(grad, opt_state)
-        params = cast(dict, optax.apply_updates(params, updates))
-        return params, opt_state
+    def train_step(state: TrainState, x: np.ndarray, y: np.ndarray) -> TrainState:
+        _, grad = loss_and_grad_fn(state.params, x, y)
+        return state.apply_gradients(grads=grad)
 
     for _ in range(cfg.max_steps):
         x, y = next(dl)
-        params, opt_state = train_step(
-            params, opt_state, x.data.numpy(), y.data.numpy()
-        )
-    loss, _ = loss_and_grad(params, X_NP, Y_NP)
-    params = cast(dict, params)
+        state = train_step(state, x.data.numpy(), y.data.numpy())
+    loss, _ = loss_and_grad_fn(state.params, X_NP, Y_NP)
+    params = cast(dict, state.params)
     w, b = params["params"]["kernel"], params["params"]["bias"]
     print_results(loss, w, b)
