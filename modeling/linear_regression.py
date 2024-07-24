@@ -77,16 +77,18 @@ class RepeatingDataLoader:
 
 
 class ModelWithLoss(nn.Module):
-    def __init__(self, model: Callable, loss_fn: Callable) -> None:
+    def __init__(self, model: Callable, loss: Callable) -> None:
         super().__init__()
         self._model = model
-        self._loss_fn = loss_fn
+        self._loss = loss
 
     def forward(
-        self, inputs: torch.Tensor, targets: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+        self, inputs: torch.Tensor, targets: torch.Tensor | None = None
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
         outputs = self._model(inputs)
-        loss = self._loss_fn(outputs, targets)
+        loss = None
+        if targets is not None:
+            loss = self._loss(outputs, targets)
         return outputs, loss
 
 
@@ -114,6 +116,18 @@ def train_torch(cfg: Config) -> None:
     print_results(loss, w, b)
 
 
+class LinearRegression(fnn.Module):
+    @fnn.compact
+    def __call__(
+        self, inputs: jax.Array, targets: jax.Array | None = None
+    ) -> tuple[jax.Array, jax.Array | None]:
+        outputs = fnn.Dense(1)(inputs)
+        loss = None
+        if targets is not None:
+            loss = jnp.mean((outputs - targets) ** 2)
+        return outputs, loss
+
+
 def train_jax(cfg: Config) -> None:
     """Trains using JAX."""
     dl = RepeatingDataLoader(
@@ -124,19 +138,17 @@ def train_jax(cfg: Config) -> None:
     )
 
     def mk_train_state() -> TrainState:
-        model = fnn.Dense(1)
-        params = model.init(jax.random.key(0), jnp.ones((X.shape[1],)))
+        model = LinearRegression()
+        params = model.init(
+            jax.random.key(0), jnp.ones(X.shape[1]), jnp.ones(Y.shape[1])
+        )
         tx = optax.adam(learning_rate=cfg.learning_rate)
         return TrainState.create(apply_fn=model.apply, params=params, tx=tx)
 
     state = mk_train_state()
-
-    @jax.jit
-    def mse(params: dict, inputs: jax.Array, targets: jax.Array) -> jax.Array:
-        outputs = state.apply_fn(params, inputs)
-        return jnp.mean((outputs - targets) ** 2)
-
-    loss_and_grad_fn = jax.jit(jax.value_and_grad(mse))
+    loss_and_grad_fn = jax.jit(
+        jax.value_and_grad(lambda *args, **kwargs: state.apply_fn(*args, **kwargs)[1])
+    )
 
     @jax.jit
     def train_step(state: TrainState, x: np.ndarray, y: np.ndarray) -> TrainState:
@@ -147,5 +159,6 @@ def train_jax(cfg: Config) -> None:
         x, y = next(dl)
         state = train_step(state, x.data.numpy(), y.data.numpy())
     loss, _ = loss_and_grad_fn(state.params, X, Y)
-    w, b = state.params["params"]["kernel"], state.params["params"]["bias"]
+    dense_params = state.params["params"]["Dense_0"]
+    w, b = dense_params["kernel"], dense_params["bias"]
     print_results(loss, w, b)  # pyright: ignore
