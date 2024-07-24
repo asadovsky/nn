@@ -7,6 +7,7 @@ Usage examples:
 """
 
 import argparse
+import dataclasses
 import datetime
 import math
 import os
@@ -142,7 +143,7 @@ def run(cfg: Config) -> None:
     assert cfg.total_batch_toks % micro_batch_toks == 0
     grad_accum_steps = cfg.total_batch_toks // micro_batch_toks
 
-    ckpt = torch.load(cfg.ckpt) if cfg.ckpt else {}
+    ckpt = torch.load(cfg.ckpt, weights_only=True) if cfg.ckpt else {}
     model, model_cfg = get_model(cfg, ckpt.get("model_sd"))
     model.to(device)
     if device != "mps":
@@ -238,7 +239,7 @@ def run(cfg: Config) -> None:
                 if step > 0 and (step % cfg.ckpt_steps == 0 or is_last_step):
                     torch.save(
                         {
-                            "model_cfg": model_cfg,
+                            "model_cfg": dataclasses.asdict(model_cfg),
                             "model_sd": model.state_dict(),
                             "optimizer_sd": optimizer.state_dict(),
                             "train_dl_sd": train_dl.state_dict(),
