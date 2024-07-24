@@ -14,8 +14,7 @@ from transformers import GPT2LMHeadModel
 
 from evaluation import hellaswag
 from modeling import device_util
-from modeling.gpt2 import model_jax
-from modeling.gpt2.model import GPT, GPTConfig
+from modeling.gpt2 import model_jax, model_torch
 
 torch.set_float32_matmul_precision("high")
 
@@ -26,7 +25,7 @@ class Config:
     test_run: bool = False
     model_name: str = "gpt2"
     use_hf: bool = False
-    use_jax: bool = True
+    use_jax: bool = False
     device: str = ""
 
 
@@ -35,10 +34,10 @@ def get_torch_model(cfg: Config, device: str) -> Callable:
         model = cast(nn.Module, GPT2LMHeadModel.from_pretrained(cfg.model_name))
     elif cfg.ckpt:
         ckpt = torch.load(cfg.ckpt, weights_only=True)
-        model = GPT(GPTConfig(**ckpt["model_cfg"]))
+        model = model_torch.GPT(model_torch.GPTConfig(**ckpt["model_cfg"]))
         model.load_state_dict(ckpt["model_sd"])
     else:
-        model = GPT.from_pretrained(cfg.model_name)
+        model = model_torch.GPT.from_pretrained(cfg.model_name)
     model.eval()
     model.to(device)
     if device != "mps":

@@ -22,7 +22,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 from modeling import device_util
 from modeling.gpt2.data_loader import GPTDataLoader
-from modeling.gpt2.model import GPT, GPTConfig
+from modeling.gpt2.model_torch import GPT, GPTConfig
 
 torch.manual_seed(0)
 if torch.cuda.is_available():

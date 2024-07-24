@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 
 import torch
 
-from modeling.gpt2.train import Config, run
+from modeling.gpt2.train_torch import Config, run
 
 
 class TrainTest(unittest.TestCase):
@@ -32,7 +32,8 @@ class TrainTest(unittest.TestCase):
             )
             self.assertFalse(os.path.exists(os.path.join(dir1, "model_000004.pt")))
             ckpt0, ckpt1 = (
-                torch.load(os.path.join(x, "model_000009.pt")) for x in [dir0, dir1]
+                torch.load(os.path.join(x, "model_000009.pt"), weights_only=True)
+                for x in [dir0, dir1]
             )
             self.assertEqual(ckpt0["val_loss"], ckpt1["val_loss"])
 
