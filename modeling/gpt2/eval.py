@@ -29,7 +29,18 @@ class Config:
     device: str = ""
 
 
-def get_torch_model(cfg: Config, device: str) -> Callable:
+def mk_model_logits_fn_jax(cfg: Config, device: str) -> Callable:
+    model, params = model_jax.GPT.from_pretrained(cfg.model_name)
+
+    def model_logits_fn(inputs: torch.Tensor) -> torch.Tensor:
+        inputs_jax = jnp.array(inputs.cpu().numpy())
+        outputs_jax = jax.jit(model.apply)(params, inputs_jax)
+        return torch.tensor(np.asarray(outputs_jax[0])).to(device)
+
+    return model_logits_fn
+
+
+def mk_model_logits_fn_torch(cfg: Config, device: str, device_type: str) -> Callable:
     if cfg.use_hf:
         model = cast(nn.Module, GPT2LMHeadModel.from_pretrained(cfg.model_name))
     elif cfg.ckpt:
@@ -42,7 +53,15 @@ def get_torch_model(cfg: Config, device: str) -> Callable:
     model.to(device)
     if device != "mps":
         model = torch.compile(model)
-    return model
+
+    def model_logits_fn(inputs: torch.Tensor) -> torch.Tensor:
+        if cfg.use_hf:
+            return model(inputs).logits
+        else:
+            with torch.autocast(device_type, dtype=torch.bfloat16):
+                return model(inputs)[0]
+
+    return model_logits_fn
 
 
 def run(cfg: Config) -> None:
@@ -50,22 +69,9 @@ def run(cfg: Config) -> None:
     device, device_type = device_util.get_device(cfg.device)
 
     if cfg.use_jax:
-        model, params = model_jax.GPT.from_pretrained(cfg.model_name)
-
-        def model_logits_fn(inputs: torch.Tensor) -> torch.Tensor:
-            inputs_jax = jnp.array(inputs.cpu().numpy())
-            outputs_jax = jax.jit(model.apply)(params, inputs_jax)
-            return torch.tensor(np.asarray(outputs_jax[0])).to(device)
-
+        model_logits_fn = mk_model_logits_fn_jax(cfg, device)
     else:
-        model = get_torch_model(cfg, device)
-
-        def model_logits_fn(inputs: torch.Tensor) -> torch.Tensor:
-            if cfg.use_hf:
-                return model(inputs).logits
-            else:
-                with torch.autocast(device_type, dtype=torch.bfloat16):
-                    return model(inputs)[0]
+        model_logits_fn = mk_model_logits_fn_torch(cfg, device, device_type)
 
     num_correct, num_total = hellaswag.run(model_logits_fn, "val", device, cfg.test_run)
     print(f"{num_correct / num_total:.4f} ({num_correct}/{num_total})")

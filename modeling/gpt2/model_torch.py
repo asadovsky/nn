@@ -38,7 +38,7 @@ class CausalSelfAttention(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Batch size, seq len, embedding dimensionality (n_embd).
-        B, T, C = x.size()
+        B, T, C = x.shape
         assert C == self._cfg.n_embd
         # Calculate QKVs for all heads.
         nh = self._cfg.n_head
@@ -104,7 +104,7 @@ class GPT(nn.Module):
     def forward(
         self, inputs: torch.Tensor, targets: torch.Tensor | None = None
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
-        _, T = inputs.size()
+        T = inputs.shape[-1]
         assert T <= self._cfg.max_seq_len
         # Token and position embeddings.
         tok_emb = self.transformer.wte(inputs)  # (B, T, n_embd)
@@ -120,7 +120,7 @@ class GPT(nn.Module):
         loss = None
         if targets is not None:
             # Calculate the average loss over the entire batch.
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+            loss = F.cross_entropy(logits.view(-1, logits.shape[-1]), targets.view(-1))
         return logits, loss
 
     @classmethod
