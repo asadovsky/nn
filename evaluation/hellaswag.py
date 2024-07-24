@@ -82,7 +82,7 @@ def run(
 ) -> tuple[int, int]:
     num_correct, num_total = 0, 0
     for example in _read_examples(split):
-        if test_run and num_total > 3:
+        if test_run and num_total > 5:
             break
         toks, mask, label = _render_example(example)
         toks, mask = toks.to(device), mask.to(device)

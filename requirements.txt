@@ -44,7 +44,7 @@ h11==0.14.0
 h5py==3.11.0
 httpcore==1.0.5
 httpx==0.27.0
-huggingface-hub==0.24.0
+huggingface-hub==0.24.2
 idna==3.7
 importlib_resources==6.4.0
 ipykernel==6.29.5
@@ -117,7 +117,7 @@ pyarrow-hotfix==0.6
 pycparser==2.22
 Pygments==2.18.0
 pyparsing==3.1.2
-pyright==1.1.372
+pyright==1.1.373
 python-dateutil==2.9.0.post0
 python-json-logger==2.0.7
 pytz==2024.1
@@ -129,12 +129,11 @@ requests==2.32.3
 rfc3339-validator==0.1.4
 rfc3986-validator==0.1.1
 rich==13.7.1
-rpds-py==0.19.0
+rpds-py==0.19.1
 ruff==0.5.4
 safetensors==0.4.3
 scipy==1.14.0
 Send2Trash==1.8.3
-setuptools==71.1.0
 six==1.16.0
 sniffio==1.3.1
 soupsieve==2.5
@@ -143,6 +142,7 @@ sympy==1.13.1
 tensorboard==2.17.0
 tensorboard-data-server==0.7.2
 tensorflow==2.17.0
+tensorflow-io-gcs-filesystem==0.37.1
 tensorstore==0.1.63
 termcolor==2.4.0
 terminado==0.18.1
@@ -151,11 +151,11 @@ tinycss2==1.3.0
 tokenize-rt==5.2.0
 tokenizers==0.19.1
 toolz==0.12.1
-torch==2.3.1
+torch==2.4.0
 tornado==6.4.1
 tqdm==4.66.4
 traitlets==5.14.3
-transformers==4.42.4
+transformers==4.43.2
 types-python-dateutil==2.9.0.20240316
 typing_extensions==4.12.2
 tzdata==2024.1
@@ -166,7 +166,6 @@ webcolors==24.6.0
 webencodings==0.5.1
 websocket-client==1.8.0
 Werkzeug==3.0.3
-wheel==0.43.0
 wrapt==1.16.0
 xxhash==3.4.1
 yarl==1.9.4

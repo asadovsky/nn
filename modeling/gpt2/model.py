@@ -19,7 +19,7 @@ def _init_weight(module: nn.Linear | nn.Embedding, n_layer: int | None = None) -
     std = 0.02
     if n_layer is not None:
         std *= (2 * n_layer) ** -0.5
-    torch.nn.init.normal_(module.weight, mean=0.0, std=std)
+    torch.nn.init.normal_(module.weight, std=std)
     if isinstance(module, nn.Linear) and module.bias is not None:  # pyright: ignore
         torch.nn.init.zeros_(module.bias)
 
@@ -27,9 +27,8 @@ def _init_weight(module: nn.Linear | nn.Embedding, n_layer: int | None = None) -
 class CausalSelfAttention(nn.Module):
     def __init__(self, cfg: GPTConfig) -> None:
         super().__init__()
+        self._cfg: GPTConfig = cfg
         assert cfg.n_embd % cfg.n_head == 0
-        self.n_head: int = cfg.n_head
-        self.n_embd: int = cfg.n_embd
         # QKV projections for all attention heads.
         self.c_attn: nn.Linear = nn.Linear(cfg.n_embd, 3 * cfg.n_embd)
         # Output projection.
@@ -40,16 +39,16 @@ class CausalSelfAttention(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Batch size, seq len, embedding dimensionality (n_embd).
         B, T, C = x.size()
-        assert C == self.n_embd
+        assert C == self._cfg.n_embd
         # Calculate QKVs for all heads.
-        nh = self.n_head
+        nh = self._cfg.n_head
         qkv = self.c_attn(x)
-        q, k, v = qkv.split(self.n_embd, dim=2)
+        q, k, v = qkv.split(self._cfg.n_embd, dim=2)
         # nh is "num heads", hs is "head size", C is "num channels" = n_embd = nh * hs.
         q = q.view(B, T, nh, C // nh).transpose(1, 2)  # (B, nh, T, hs)
         k = k.view(B, T, nh, C // nh).transpose(1, 2)  # (B, nh, T, hs)
         v = v.view(B, T, nh, C // nh).transpose(1, 2)  # (B, nh, T, hs)
-        x = F.scaled_dot_product_attention(q, k, v, is_causal=True)  # flash attention
+        x = F.scaled_dot_product_attention(q, k, v, is_causal=True)
         x = x.transpose(1, 2).contiguous().view(B, T, C)
         x = self.c_proj(x)
         return x
@@ -98,7 +97,7 @@ class GPT(nn.Module):
             )
         )
         self.lm_head: nn.Linear = nn.Linear(cfg.n_embd, cfg.vocab_size, bias=False)
-        self.transformer.wte.weight = self.lm_head.weight  # share weights
+        self.lm_head.weight = self.transformer.wte.weight
         _init_weight(self.transformer.wte)
         _init_weight(self.transformer.wpe)
 

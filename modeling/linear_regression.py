@@ -14,7 +14,7 @@ from flax.training.train_state import TrainState
 from jax import numpy as jnp
 from keras.layers import Dense, Input
 from keras.models import Sequential
-from torch import nn
+from torch import nn as tnn
 from torch.utils.data import TensorDataset
 from torch.utils.data.dataloader import DataLoader
 
@@ -76,7 +76,7 @@ class RepeatingDataLoader:
             return next(self._it)
 
 
-class ModelWithLoss(nn.Module):
+class ModelWithLoss(tnn.Module):
     def __init__(self, model: Callable, loss: Callable) -> None:
         super().__init__()
         self._model = model
@@ -94,8 +94,10 @@ class ModelWithLoss(nn.Module):
 
 def train_torch(cfg: Config) -> None:
     """Trains using PyTorch."""
-    model = ModelWithLoss(nn.Linear(X.shape[1], 1), nn.MSELoss())
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
+    model = ModelWithLoss(tnn.Linear(X.shape[1], 1), tnn.MSELoss())
+    optimizer = torch.optim.Adam(  # pyright: ignore [reportPrivateImportUsage]
+        model.parameters(), lr=cfg.learning_rate
+    )
     dl = RepeatingDataLoader(
         DataLoader(
             TensorDataset(torch.Tensor(X), torch.Tensor(Y)),
@@ -117,7 +119,7 @@ def train_torch(cfg: Config) -> None:
 
 
 class LinearRegression(fnn.Module):
-    @fnn.compact
+    @fnn.compact  # pyright: ignore [reportUntypedFunctionDecorator]
     def __call__(
         self, inputs: jax.Array, targets: jax.Array | None = None
     ) -> tuple[jax.Array, jax.Array | None]:
@@ -150,7 +152,7 @@ def train_jax(cfg: Config) -> None:
         jax.value_and_grad(lambda *args, **kwargs: state.apply_fn(*args, **kwargs)[1])
     )
 
-    @jax.jit
+    @jax.jit  # pyright: ignore [reportUntypedFunctionDecorator]
     def train_step(state: TrainState, x: np.ndarray, y: np.ndarray) -> TrainState:
         _, grad = loss_and_grad_fn(state.params, x, y)
         return state.apply_gradients(grads=grad)
