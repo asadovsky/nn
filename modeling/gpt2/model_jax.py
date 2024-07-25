@@ -29,10 +29,10 @@ def _weight_init(n_layer: int | None = None):
 # TODO: Use flash attention.
 def _causal_attention(q: jax.Array, k: jax.Array, v: jax.Array) -> jax.Array:
     T = q.shape[-2]
-    att = jnp.matmul(q, k.transpose(0, 1, 3, 2)) / jnp.sqrt(q.shape[-1])
-    att = jnp.where(jnp.tril(jnp.ones((T, T))) == 0, float("-inf"), att)
-    att = jax.nn.softmax(att, axis=-1)
-    return jnp.matmul(att, v)
+    attn = jnp.matmul(q, k.transpose(0, 1, 3, 2)) / jnp.sqrt(q.shape[-1])
+    attn = jnp.where(jnp.tril(jnp.ones((T, T))) == 0, float("-inf"), attn)
+    attn = jax.nn.softmax(attn, axis=-1)
+    return jnp.matmul(attn, v)
 
 
 class CausalSelfAttention(nn.Module):

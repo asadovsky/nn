@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 import torch
@@ -24,6 +25,16 @@ def _init_weight(module: nn.Linear | nn.Embedding, n_layer: int | None = None) -
         torch.nn.init.zeros_(module.bias)
 
 
+def _causal_attention(
+    q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
+) -> torch.Tensor:
+    T = q.shape[-2]
+    attn = q @ k.transpose(-2, -1) / math.sqrt(q.shape[-1])
+    attn = attn.masked_fill(torch.tril(torch.ones((T, T))) == 0, float("-inf"))
+    attn = F.softmax(attn, dim=-1)
+    return attn @ v
+
+
 class CausalSelfAttention(nn.Module):
     def __init__(self, cfg: GPTConfig) -> None:
         super().__init__()
@@ -48,7 +59,10 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, nh, C // nh).transpose(1, 2)  # (B, nh, T, hs)
         k = k.view(B, T, nh, C // nh).transpose(1, 2)  # (B, nh, T, hs)
         v = v.view(B, T, nh, C // nh).transpose(1, 2)  # (B, nh, T, hs)
-        x = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        if True:
+            x = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        else:
+            x = _causal_attention(q, k, v)
         x = x.transpose(1, 2).contiguous().view(B, T, C)
         x = self.c_proj(x)
         return x
