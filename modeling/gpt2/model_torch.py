@@ -143,7 +143,7 @@ class GPT(nn.Module):
         sd_hf = model_hf.state_dict()
         assert len(sd.keys()) == len(sd_hf.keys())
 
-        # Convert Conv1D to nn.Linear by transposing.
+        # Convert transformers.pytorch_utils.Conv1D to nn.Linear by transposing.
         transpose = [
             ".attn.c_attn.weight",
             ".attn.c_proj.weight",
@@ -154,7 +154,7 @@ class GPT(nn.Module):
             if any(k.endswith(x) for x in transpose):
                 assert sd_hf[k].shape[::-1] == sd[k].shape
                 with torch.no_grad():
-                    sd[k].copy_(sd_hf[k].t())
+                    sd[k].copy_(sd_hf[k].T)
             else:
                 assert sd_hf[k].shape == sd[k].shape
                 with torch.no_grad():
