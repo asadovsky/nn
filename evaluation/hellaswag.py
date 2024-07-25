@@ -78,7 +78,7 @@ def _get_most_likely_row(
 
 
 def run(
-    model_logits_fn: Callable, split: str, device: str, test_run: bool
+    logits_fn: Callable, split: str, device: str, test_run: bool
 ) -> tuple[int, int]:
     num_correct, num_total = 0, 0
     for example in _read_examples(split):
@@ -87,7 +87,7 @@ def run(
         toks, mask, label = _render_example(example)
         toks, mask = toks.to(device), mask.to(device)
         with torch.no_grad():
-            pred = _get_most_likely_row(toks, mask, model_logits_fn(toks))
+            pred = _get_most_likely_row(toks, mask, logits_fn(toks))
         if pred == label:
             num_correct += 1
         num_total += 1
