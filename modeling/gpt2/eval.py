@@ -67,12 +67,10 @@ def mk_model_logits_fn_torch(cfg: Config, device: str, device_type: str) -> Call
 def run(cfg: Config) -> None:
     assert not (cfg.use_hf and cfg.use_jax)
     device, device_type = device_util.get_device(cfg.device)
-
     if cfg.use_jax:
         model_logits_fn = mk_model_logits_fn_jax(cfg, device)
     else:
         model_logits_fn = mk_model_logits_fn_torch(cfg, device, device_type)
-
     num_correct, num_total = hellaswag.run(model_logits_fn, "val", device, cfg.test_run)
     print(f"{num_correct / num_total:.4f} ({num_correct}/{num_total})")
 

@@ -137,13 +137,11 @@ class GPT(nn.Module):
         cfg_dict["max_seq_len"] = 1024
         model = GPT(GPTConfig(**cfg_dict))
         sd = model.state_dict()
-        sd_keys = sd.keys()
 
         model_hf = GPT2LMHeadModel.from_pretrained(model_name)
         assert isinstance(model_hf, nn.Module)
         sd_hf = model_hf.state_dict()
-        sd_keys_hf = sd_hf.keys()
-        assert len(sd_keys) == len(sd_keys_hf)
+        assert len(sd.keys()) == len(sd_hf.keys())
 
         # Convert Conv1D to nn.Linear by transposing.
         transpose = [
@@ -152,7 +150,7 @@ class GPT(nn.Module):
             ".mlp.c_fc.weight",
             ".mlp.c_proj.weight",
         ]
-        for k in sd_keys_hf:
+        for k in sd_hf.keys():
             if any(k.endswith(x) for x in transpose):
                 assert sd_hf[k].shape[::-1] == sd[k].shape
                 with torch.no_grad():

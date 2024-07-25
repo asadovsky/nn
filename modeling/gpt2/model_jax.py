@@ -108,13 +108,10 @@ class GPT(nn.Module):
     _cfg: GPTConfig
 
     def setup(self):
-        self.shared_weight = self.param(
-            "shared_weight", _weight_init(), (self._cfg.vocab_size, self._cfg.n_embd)
-        )
         self.wte: nn.Embed = nn.Embed(
             self._cfg.vocab_size,
             self._cfg.n_embd,
-            embedding_init=lambda *_: self.shared_weight,
+            embedding_init=_weight_init(),
         )
         self.wpe: nn.Embed = nn.Embed(
             self._cfg.max_seq_len, self._cfg.n_embd, embedding_init=_weight_init()
@@ -124,7 +121,7 @@ class GPT(nn.Module):
         self.lm_head: nn.Dense = nn.Dense(
             self._cfg.vocab_size,
             use_bias=False,
-            kernel_init=lambda *_: self.shared_weight.T,
+            kernel_init=lambda *_: self.wte.embedding.T,
         )
 
     def __call__(
@@ -178,27 +175,29 @@ class GPT(nn.Module):
         model_hf = GPT2LMHeadModel.from_pretrained(model_name)
         assert isinstance(model_hf, tnn.Module)
         sd_hf = model_hf.state_dict()
-        sd_keys_hf = sd_hf.keys()
 
         def copy_params_from_hf(params: dict, parent_path: str = "") -> int:
-            num_copied = 0
+            num_updated = 0
             for k, v in params.items():
                 path = f"{parent_path}.{k}" if parent_path else k
                 if isinstance(v, dict):
-                    num_copied += copy_params_from_hf(v, path)
+                    num_updated += copy_params_from_hf(v, path)
                 else:
-                    if path in {"params.shared_weight", "params.lm_head.kernel"}:
+                    if path == "params.lm_head.kernel":
                         continue
-                    path = re.sub(r"h_(\d)", r"h.\1", path)
-                    path = path.replace("params", "transformer")
-                    path = path.replace("embedding", "weight")
-                    path = path.replace("kernel", "weight")
-                    path = path.replace("scale", "weight")
+                    else:
+                        path = re.sub(r"h_(\d)", r"h.\1", path)
+                        path = path.replace("params", "transformer")
+                        path = path.replace("embedding", "weight")
+                        path = path.replace("kernel", "weight")
+                        path = path.replace("scale", "weight")
                     assert sd_hf[path].shape == params[k].shape
                     params[k] = jnp.array(sd_hf[path].numpy())
-                    num_copied += 1
-            return num_copied
+                    num_updated += 1
+            return num_updated
 
-        num_copied = copy_params_from_hf(params)
-        assert num_copied == len(sd_keys_hf) - 1
+        num_updated = copy_params_from_hf(params)
+        params["params"]["lm_head"]["kernel"] = params["params"]["wte"]["embedding"].T
+        num_updated += 1
+        assert num_updated == len(sd_hf.keys())
         return model, params
