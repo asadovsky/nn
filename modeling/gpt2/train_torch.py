@@ -2,8 +2,8 @@
 
 Usage examples:
 
-    $ PYTHONPATH=. python modeling/gpt2/train.py
-    $ PYTHONPATH=. torchrun --standalone --nproc_per_node=8 modeling/gpt2/train.py
+    $ PYTHONPATH=. python modeling/gpt2/train_torch.py
+    $ PYTHONPATH=. torchrun --standalone --nproc_per_node=8 modeling/gpt2/train_torch.py
 """
 
 import argparse
