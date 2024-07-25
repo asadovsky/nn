@@ -26,11 +26,10 @@ def _weight_init(n_layer: int | None = None):
     return normal(std)
 
 
-# TODO: Check correctness.
-# TODO: Use flash attention if possible.
+# TODO: Use flash attention.
 def _causal_attention(q: jax.Array, k: jax.Array, v: jax.Array) -> jax.Array:
     T = q.shape[-2]
-    att = jnp.matmul(q, k.transpose(0, 1, 3, 2)) * 1.0 / jnp.sqrt(q.shape[-1])
+    att = jnp.matmul(q, k.transpose(0, 1, 3, 2)) / jnp.sqrt(q.shape[-1])
     att = jnp.where(jnp.tril(jnp.ones((T, T))) == 0, float("-inf"), att)
     att = jax.nn.softmax(att, axis=-1)
     return jnp.matmul(att, v)
@@ -142,7 +141,7 @@ class GPT(nn.Module):
         logits = self.lm_head(x)  # (B, T, vocab_size)
         loss = None
         if targets is not None:
-            # TODO: Check correctness.
+            # Calculate the average loss over the entire batch.
             loss = jnp.mean(
                 optax.softmax_cross_entropy(
                     logits, jax.nn.one_hot(targets, self._cfg.vocab_size)
@@ -164,7 +163,6 @@ class GPT(nn.Module):
         cfg_dict["max_seq_len"] = 1024
         cfg = GPTConfig(**cfg_dict)
         model = GPT(cfg)
-        # TODO: Drop batch dimension if possible.
         params = model.init(
             jax.random.key(0),
             jnp.ones((1, cfg.max_seq_len), dtype=jnp.int32),
