@@ -26,8 +26,8 @@ def _weight_init(n_layer: int | None = None):
     return normal(std)
 
 
-# TODO: Use flash attention.
 def _causal_attention(q: jax.Array, k: jax.Array, v: jax.Array) -> jax.Array:
+    # TODO: Use flash attention.
     T = q.shape[-2]
     attn = jnp.matmul(q, k.transpose(0, 1, 3, 2)) / jnp.sqrt(q.shape[-1])
     attn = jnp.where(jnp.tril(jnp.ones((T, T))) == 0, float("-inf"), attn)
