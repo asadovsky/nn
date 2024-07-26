@@ -34,8 +34,8 @@ class GPTDataLoader:
     def __next__(self) -> tuple[torch.Tensor, torch.Tensor]:
         B, T = self._batch_size, self._seq_len
         buf = self._toks[self._tok_idx : self._tok_idx + B * T + 1]
-        x = (buf[:-1]).view(B, T)  # inputs
-        y = (buf[1:]).view(B, T)  # targets
+        x = buf[:-1].view(B, T)  # inputs
+        y = buf[1:].view(B, T)  # targets
         self._tok_idx += B * T * self._ddp_world_size
         # Advance to next shard if needed.
         if self._tok_idx + B * T * self._ddp_world_size >= len(self._toks):

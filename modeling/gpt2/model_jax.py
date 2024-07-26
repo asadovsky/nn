@@ -92,9 +92,9 @@ class Block(nn.Module):
     _cfg: GPTConfig
 
     def setup(self):
-        self.ln_1: nn.LayerNorm = nn.LayerNorm()
+        self.ln_1: nn.LayerNorm = nn.LayerNorm(epsilon=1e-5)
         self.attn: CausalSelfAttention = CausalSelfAttention(self._cfg)
-        self.ln_2: nn.LayerNorm = nn.LayerNorm()
+        self.ln_2: nn.LayerNorm = nn.LayerNorm(epsilon=1e-5)
         self.mlp: MLP = MLP(self._cfg)
 
     def __call__(self, x: jax.Array) -> jax.Array:
@@ -116,7 +116,7 @@ class GPT(nn.Module):
             self._cfg.max_seq_len, self._cfg.n_embd, embedding_init=_weight_init()
         )
         self.h = [Block(self._cfg) for _ in range(self._cfg.n_layer)]
-        self.ln_f: nn.LayerNorm = nn.LayerNorm()
+        self.ln_f: nn.LayerNorm = nn.LayerNorm(epsilon=1e-5)
         self.lm_head: nn.Dense = nn.Dense(
             self._cfg.vocab_size,
             use_bias=False,

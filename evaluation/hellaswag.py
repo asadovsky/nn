@@ -64,14 +64,14 @@ def _get_most_likely_row(
     toks: torch.Tensor, mask: torch.Tensor, logits: torch.Tensor
 ) -> int:
     # Compute the autoregressive loss at all positions.
-    shift_toks = (toks[..., 1:]).contiguous()
-    shift_logits = (logits[..., :-1, :]).contiguous()
+    shift_toks = toks[..., 1:].contiguous()
+    shift_logits = logits[..., :-1, :].contiguous()
     flat_shift_toks = shift_toks.view(-1)
     flat_shift_logits = shift_logits.view(-1, shift_logits.size(-1))
     shift_losses = F.cross_entropy(flat_shift_logits, flat_shift_toks, reduction="none")
     shift_losses = shift_losses.view(toks.size(0), -1)
     # Get the average loss for each ending (where mask is 1).
-    shift_mask = (mask[..., 1:]).contiguous()
+    shift_mask = mask[..., 1:].contiguous()
     avg_loss = (shift_losses * shift_mask).sum(dim=1) / shift_mask.sum(dim=1)
     # Pick the ending with the lowest loss.
     return int(avg_loss.argmin().item())
