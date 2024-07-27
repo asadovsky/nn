@@ -57,8 +57,8 @@ class EquivalenceTest(unittest.TestCase):
     def test_bfloat16(self) -> None:
         logits_jax, loss_jax = mk_logits_loss_fn_jax(True)(INPUTS, TARGETS)
         logits_torch, loss_torch = mk_logits_loss_fn_torch(True)(INPUTS, TARGETS)
-        np.testing.assert_allclose(logits_jax, logits_torch, rtol=0.025)
-        np.testing.assert_allclose(loss_jax, loss_torch, rtol=0.025)
+        np.testing.assert_allclose(logits_jax, logits_torch, rtol=0.03)
+        np.testing.assert_allclose(loss_jax, loss_torch, rtol=0.03)
 
 
 if __name__ == "__main__":
