@@ -46,6 +46,11 @@ class Config:
     ckpt_steps: int = 2000
     max_lr: float = 6e-4
     warmup_steps: int = 715  # 375M tokens, batch size 2**19 tokens
+    device: str = ""
+
+
+def now_str() -> str:
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
 def get_lr(cfg: Config, step: int):
@@ -65,7 +70,9 @@ def get_lr(cfg: Config, step: int):
     return min_lr + coeff * (cfg.max_lr - min_lr)
 
 
-def get_model(cfg: Config, state: dict | None) -> tuple[GPT, GPTConfig]:
+def get_model(
+    cfg: Config, state: dict | None, device: str, use_ddp: bool, ddp_local_rank: int
+) -> tuple[nn.Module, GPTConfig]:
     # Note, 50304 is slightly larger than the GPT-2 vocab size and is divisible by 128.
     model_cfg = (
         GPTConfig(max_seq_len=64, n_layer=2, n_head=2, n_embd=4)
@@ -74,7 +81,13 @@ def get_model(cfg: Config, state: dict | None) -> tuple[GPT, GPTConfig]:
     )
     model = GPT(model_cfg)
     if state is not None:
-        model.load_state_dict(state)
+        model.load_state_dict_supporting_compile(state)
+    model.to(device)
+    if device != "mps":
+        model = torch.compile(model)
+    if use_ddp:
+        model = DDP(model, device_ids=[ddp_local_rank])
+    assert isinstance(model, nn.Module)
     return model, model_cfg
 
 
@@ -121,7 +134,7 @@ def run(cfg: Config) -> None:
         cfg.ckpt_steps = 4
     assert cfg.ckpt_steps % cfg.val_steps == 0
 
-    device, device_type = device_util.get_device()
+    device, device_type = device_util.get_device(cfg.device)
     use_ddp = os.getenv("RANK") is not None
     if use_ddp:
         assert device in {"cpu", "cuda"}
@@ -144,13 +157,9 @@ def run(cfg: Config) -> None:
     grad_accum_steps = cfg.total_batch_toks // micro_batch_toks
 
     ckpt = torch.load(cfg.ckpt, weights_only=True) if cfg.ckpt else {}
-    model, model_cfg = get_model(cfg, ckpt.get("model_sd"))
-    model.to(device)
-    if device != "mps":
-        model = torch.compile(model)
-    if use_ddp:
-        model = DDP(model, device_ids=[ddp_local_rank])
-    assert isinstance(model, nn.Module)
+    model, model_cfg = get_model(
+        cfg, ckpt.get("model_sd"), device, use_ddp, ddp_local_rank
+    )
     optimizer = get_optimizer(
         cfg, ckpt.get("optimizer_sd"), model, device_type == "cuda"
     )
@@ -206,7 +215,7 @@ def run(cfg: Config) -> None:
         t1 = time.time()
         dt = t1 - t0
         if is_master_process:
-            s = f"{step=} train_loss={train_loss_accum.item():.6f}"
+            s = f"{now_str()} {step=} train_loss={train_loss_accum.item():.6f}"
             print(
                 f"{s} {lr=:.4e} {norm=:.4f} "
                 f"dt={(dt * 1000):.2f}ms tok/sec={(cfg.total_batch_toks / dt):.2f}"
@@ -232,7 +241,7 @@ def run(cfg: Config) -> None:
                 dist.all_reduce(val_loss_accum, op=dist.ReduceOp.AVG)
 
             if is_master_process:
-                s = f"{step=} val_loss={val_loss_accum.item():.6f}"
+                s = f"{now_str()} {step=} val_loss={val_loss_accum.item():.6f}"
                 print(s)
                 with open(log_file, "a") as f:
                     f.write(f"{s}\n")

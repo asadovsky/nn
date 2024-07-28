@@ -47,7 +47,7 @@ def mk_logits_fn_torch(cfg: Config, device: str, device_type: str) -> Callable:
     elif cfg.ckpt:
         ckpt = torch.load(cfg.ckpt, weights_only=True)
         model = model_torch.GPT(model_torch.GPTConfig(**ckpt["model_cfg"]))
-        model.load_state_dict(ckpt["model_sd"])
+        model.load_state_dict_supporting_compile(ckpt["model_sd"])
     else:
         model = model_torch.GPT.from_pretrained(cfg.model_name)
     model.eval()

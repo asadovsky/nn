@@ -21,13 +21,16 @@ class TrainTest(unittest.TestCase):
                 )
 
     def test_ckpt(self) -> None:
+        """Checks that starting from a checkpoint yields an identical result."""
         with TemporaryDirectory() as dir0, TemporaryDirectory() as dir1:
-            run(Config(test_run=True, run_dir=dir0))
+            # Train on CPU to exercise torch.compile.
+            run(Config(test_run=True, run_dir=dir0, device="cpu"))
             run(
                 Config(
                     ckpt=os.path.join(dir0, "model_000004.pt"),
                     test_run=True,
                     run_dir=dir1,
+                    device="cpu",
                 )
             )
             self.assertFalse(os.path.exists(os.path.join(dir1, "model_000004.pt")))

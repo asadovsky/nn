@@ -1,5 +1,7 @@
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -174,3 +176,10 @@ class GPT(nn.Module):
                     sd[k].copy_(sd_hf[k])
 
         return model
+
+    def load_state_dict_supporting_compile(self, sd: Mapping[str, Any]):
+        if self.state_dict().keys() == sd.keys():
+            return super().load_state_dict(sd)
+        super().load_state_dict(
+            {k.removeprefix("_orig_mod."): v for k, v in sd.items()}
+        )

@@ -42,7 +42,7 @@ Launch an instance on https://lambdalabs.com/ and connect to it using SSH.
 Install Python 3.11, create venv, and clone repo:
 
     $ sudo apt update
-    $ sudo apt install python3.11 python3.11-venv
+    $ sudo apt install python3.11 python3.11-dev python3.11-venv
     $ python3.11 -m venv .venv
     $ git clone https://github.com/asadovsky/nn.git
 
