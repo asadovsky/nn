@@ -119,7 +119,7 @@ def train_torch(cfg: Config) -> None:
 
 
 class LinearRegression(fnn.Module):
-    @fnn.compact  # pyright: ignore [reportUntypedFunctionDecorator]
+    @fnn.compact
     def __call__(
         self, inputs: jax.Array, targets: jax.Array | None = None
     ) -> tuple[jax.Array, jax.Array | None]:
@@ -152,7 +152,7 @@ def train_jax(cfg: Config) -> None:
         jax.value_and_grad(lambda *args, **kwargs: state.apply_fn(*args, **kwargs)[1])
     )
 
-    @jax.jit  # pyright: ignore [reportUntypedFunctionDecorator]
+    @jax.jit
     def train_step(state: TrainState, x: np.ndarray, y: np.ndarray) -> TrainState:
         _, grad = loss_and_grad_fn(state.params, x, y)
         return state.apply_gradients(grads=grad)
