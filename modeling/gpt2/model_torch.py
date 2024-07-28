@@ -181,5 +181,8 @@ class GPT(nn.Module):
         if self.state_dict().keys() == sd.keys():
             return super().load_state_dict(sd)
         super().load_state_dict(
-            {k.removeprefix("_orig_mod."): v for k, v in sd.items()}
+            {
+                k.removeprefix("module.").removeprefix("_orig_mod."): v
+                for k, v in sd.items()
+            }
         )
