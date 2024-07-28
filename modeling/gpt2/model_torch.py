@@ -177,11 +177,13 @@ class GPT(nn.Module):
 
         return model
 
-    def load_state_dict_supporting_compile(self, sd: Mapping[str, Any]):
+    def load_state_dict_supporting_compile_and_ddp(self, sd: Mapping[str, Any]):
         if self.state_dict().keys() == sd.keys():
             return super().load_state_dict(sd)
         super().load_state_dict(
             {
+                # DDP adds "module.", torch.compile adds "_orig_mod.". Here we assume
+                # that torch.compile was done first.
                 k.removeprefix("module.").removeprefix("_orig_mod."): v
                 for k, v in sd.items()
             }

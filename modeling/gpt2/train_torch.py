@@ -81,7 +81,7 @@ def get_model(
     )
     model = GPT(model_cfg)
     if state is not None:
-        model.load_state_dict_supporting_compile(state)
+        model.load_state_dict_supporting_compile_and_ddp(state)
     model.to(device)
     if device != "mps":
         model = torch.compile(model)
