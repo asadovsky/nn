@@ -38,9 +38,6 @@ if [ $FMT ]; then
     ruff check --fix-only .
     ruff format .
   fi
-  if [ "$(command -v black)" ]; then
-    black .
-  fi
 else
   if [ "$(command -v go)" -a -f go.mod ]; then
     go vet ./...
@@ -54,9 +51,6 @@ else
   if [ "$(command -v ruff)" ]; then
     ruff check .
     ruff format --check .
-  fi
-  if [ "$(command -v black)" ]; then
-    black --check .
   fi
   readonly PY_FILES=$(list-files py)
   if [ "$PY_FILES" != '' ]; then

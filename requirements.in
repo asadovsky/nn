@@ -1,6 +1,4 @@
 absl-py
-black
-black[jupyter]
 datasets
 flax
 ipykernel
