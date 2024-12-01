@@ -1,5 +1,6 @@
-.ipynb_checkpoints
-.runs
-__pycache__
+.ipynb_checkpoints/
+.runs/
+.venv/
+__pycache__/
 notebook.ipynb
 resources/*/
