@@ -10,7 +10,7 @@ from typing import cast
 import datasets
 import numpy as np
 import tiktoken
-from tqdm import tqdm
+from tqdm import tqdm  # pyright: ignore[reportMissingModuleSource]
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "FineWeb-Edu-10B")
 TOKS_PER_SHARD = int(1e8)  # 100M

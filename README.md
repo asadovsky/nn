@@ -23,18 +23,6 @@ We recommend adding this to your `~/.bashrc` file:
     alias va='source .venv/bin/activate'
     alias vd='deactivate'
 
-### pip
-
-Install required packages:
-
-    $ pip install -r requirements.txt
-
-Add a new package (using `numpy` as an example):
-
-    $ echo numpy >> requirements.in && sort -u -o requirements.in requirements.in
-    $ pip install -r requirements.in
-    $ pip freeze > requirements.txt
-
 ## Training on Lambda Cloud
 
 Launch an instance on https://lambdalabs.com/ and connect to it using SSH.
