@@ -2,13 +2,10 @@
 
 import unittest
 
-from modeling.linear_regression import Config, train_jax, train_keras, train_torch
+from modeling.linear_regression import Config, train_jax, train_torch
 
 
 class LinearRegressionTest(unittest.TestCase):
-    def test_train_keras(self) -> None:
-        train_keras(Config())
-
     def test_train_torch(self) -> None:
         train_torch(Config())
 

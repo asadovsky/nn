@@ -1,6 +1,5 @@
 """Utilities for GloVe embeddings."""
 
-import keras
 import numpy as np
 
 
@@ -42,29 +41,3 @@ def prune_glove(dim: int, words_to_keep: list[str]) -> None:
         if vec is not None:
             pruned_word2vec[word] = vec
     _write_pruned_glove(dim, pruned_word2vec)
-
-
-def mk_embedding_matrix(
-    id2word: list[str], word2vec: dict[str, np.ndarray], initializer: str
-) -> np.ndarray:
-    """Returns an embedding matrix for the given words.
-
-    Args:
-        id2word: List of words (map of id to word) to include in the matrix.
-        word2vec: Map of word to embedding.
-        initializer: Name of initializer to use, e.g. "uniform".
-    """
-    input_dim = len(id2word)
-    output_dim = len(next(iter(word2vec.values())))
-    init_fn = keras.initializers.get(initializer)
-    assert isinstance(init_fn, keras.initializers.Initializer)
-    res = np.zeros((input_dim, output_dim))
-    for i, word in enumerate(id2word):
-        vec = word2vec.get(word)
-        if vec is None:
-            # Generate random embeddings for all words missing from word2vec,
-            # including UNK.
-            res[i] = init_fn((output_dim,)).numpy()
-        else:
-            res[i] = vec
-    return res

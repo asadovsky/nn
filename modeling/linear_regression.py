@@ -5,20 +5,16 @@ from dataclasses import dataclass
 from typing import Any
 
 import jax
-import keras
 import numpy as np
 import optax
 import torch
 from flax import linen as fnn
 from flax.training.train_state import TrainState
 from jax import numpy as jnp
-from keras.layers import Dense, Input
-from keras.models import Sequential
 from torch import nn as tnn
 from torch.utils.data import TensorDataset
 from torch.utils.data.dataloader import DataLoader
 
-keras.utils.set_random_seed(0)
 torch.manual_seed(0)
 
 N = 1000
@@ -35,27 +31,6 @@ class Config:
 
 def print_results(loss: float, w: np.ndarray, b: np.ndarray) -> None:
     print(f"{loss=:.6f} w={np.array_str(w.reshape(-1), precision=3)} b={b.item():.3f}")
-
-
-def train_keras(cfg: Config) -> None:
-    """Trains using Keras."""
-    model = Sequential()
-    model.add(Input(shape=(X.shape[1],)))
-    model.add(Dense(1))
-    model.compile(
-        loss="mean_squared_error",
-        optimizer=keras.optimizers.Adam(learning_rate=cfg.learning_rate),
-    )
-    model.fit(
-        X,
-        Y,
-        batch_size=cfg.batch_size,
-        epochs=cfg.max_steps * cfg.batch_size // N,
-        verbose=0,
-    )
-    loss = model.evaluate(X, Y, verbose=0)
-    w, b = model.layers[0].get_weights()
-    print_results(loss, w, b)
 
 
 class RepeatingDataLoader:
@@ -119,7 +94,7 @@ def train_torch(cfg: Config) -> None:
 
 
 class LinearRegression(fnn.Module):
-    @fnn.compact  # pyright: ignore[reportUntypedFunctionDecorator]
+    @fnn.compact
     def __call__(
         self, inputs: jax.Array, targets: jax.Array | None = None
     ) -> tuple[jax.Array, jax.Array | None]:
@@ -152,7 +127,7 @@ def train_jax(cfg: Config) -> None:
         jax.value_and_grad(lambda *args, **kwargs: state.apply_fn(*args, **kwargs)[1])
     )
 
-    @jax.jit  # pyright: ignore[reportUntypedFunctionDecorator]
+    @jax.jit
     def train_step(state: TrainState, x: np.ndarray, y: np.ndarray) -> TrainState:
         _, grad = loss_and_grad_fn(state.params, x, y)
         return state.apply_gradients(grads=grad)
