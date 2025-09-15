@@ -70,7 +70,7 @@ class ModelWithLoss(tnn.Module):
 def train_torch(cfg: Config) -> None:
     """Trains using PyTorch."""
     model = ModelWithLoss(tnn.Linear(X.shape[1], 1), tnn.MSELoss())
-    optimizer = torch.optim.Adam(  # pyright: ignore [reportPrivateImportUsage]
+    optimizer = torch.optim.Adam(  # pyright: ignore[reportPrivateImportUsage]
         model.parameters(), lr=cfg.learning_rate
     )
     dl = RepeatingDataLoader(

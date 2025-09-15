@@ -93,11 +93,11 @@ def get_model(
 
 def get_optimizer(
     cfg: Config, state: dict | None, model: nn.Module, fused: bool
-) -> torch.optim.Optimizer:  # pyright: ignore [reportPrivateImportUsage]
+) -> torch.optim.Optimizer:  # pyright: ignore[reportPrivateImportUsage]
     params = [p for p in model.parameters() if p.requires_grad]
     params_decay = [p for p in params if p.dim() >= 2]
     params_no_decay = [p for p in params if p.dim() < 2]
-    optimizer = torch.optim.AdamW(  # pyright: ignore [reportPrivateImportUsage]
+    optimizer = torch.optim.AdamW(  # pyright: ignore[reportPrivateImportUsage]
         [
             {"params": params_decay, "weight_decay": 0.1},
             {"params": params_no_decay, "weight_decay": 0.0},
