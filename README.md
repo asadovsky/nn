@@ -4,7 +4,7 @@
 
 ### Requirements
 
-- Python version 3.11 or above
+- Python version 3.12 or above
 - Node.js version 16 or above (for Pyright)
 
 ### pyenv
@@ -27,11 +27,11 @@ We recommend adding this to your `~/.bashrc` file:
 
 Launch an instance on https://lambdalabs.com/ and connect to it using SSH.
 
-Install Python 3.11, create venv, and clone repo:
+Install Python 3.12, create venv, and clone repo:
 
     $ sudo apt update
-    $ sudo apt install python3.11 python3.11-dev python3.11-venv
-    $ python3.11 -m venv .venv
+    $ sudo apt install python3.12 python3.12-dev python3.12-venv
+    $ python3.12 -m venv .venv
     $ git clone https://github.com/asadovsky/nn.git
 
 Download a run:
